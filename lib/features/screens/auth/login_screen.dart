@@ -239,7 +239,12 @@ class _LoginScreenState extends State<LoginScreen> {
       obscureText: obscureText,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
-      style: GoogleFonts.cinzel(color: AppTheme.gold, fontSize: 14),
+      style: const TextStyle(
+        color: AppTheme.gold,
+        fontSize: 14,
+        fontFamily: 'Georgia',
+        fontWeight: FontWeight.normal,
+      ),
       cursorColor: AppTheme.gold,
       decoration: InputDecoration(
         isDense: true,
@@ -262,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppTheme.crimson, width: 2),
         ),
-        errorStyle: GoogleFonts.cinzel(
+        errorStyle: const TextStyle(
           color: AppTheme.brightGold,
           fontSize: 11,
         ),

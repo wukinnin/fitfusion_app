@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme.dart';
 
+
 class VerifyEmailScreen extends StatefulWidget {
   const VerifyEmailScreen({super.key});
 
@@ -12,9 +13,7 @@ class VerifyEmailScreen extends StatefulWidget {
 }
 
 class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
-  final List<TextEditingController> _controllers =
-      List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  final _otpController = TextEditingController();
 
   bool _isLoading = false;
   bool _isResending = false;
@@ -22,20 +21,13 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   @override
   void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
+    _otpController.dispose();
     super.dispose();
   }
 
-  String get _otpCode => _controllers.map((c) => c.text).join();
-
   Future<void> _handleVerify() async {
-    final code = _otpCode;
-    if (code.length < 6) {
+    final code = _otpController.text.trim();
+    if (code.length != 6) {
       setState(() => _errorMessage = 'Please enter all 6 digits');
       return;
     }
@@ -85,24 +77,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
-  void _onDigitChanged(int index, String value) {
-    if (value.length == 1 && index < 5) {
-      _focusNodes[index + 1].requestFocus();
-    }
-    if (_errorMessage != null) {
-      setState(() => _errorMessage = null);
-    }
-  }
-
-  void _onDigitBackspace(int index, KeyEvent event) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.backspace &&
-        _controllers[index].text.isEmpty &&
-        index > 0) {
-      _focusNodes[index - 1].requestFocus();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final email = ModalRoute.of(context)?.settings.arguments as String? ?? '';
@@ -136,52 +110,53 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   ),
                 const SizedBox(height: 40),
 
-                // OTP digit boxes
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(6, (index) {
-                    return Container(
-                      width: 44,
-                      height: 52,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      child: KeyboardListener(
-                        focusNode: FocusNode(),
-                        onKeyEvent: (event) => _onDigitBackspace(index, event),
-                        child: TextFormField(
-                          controller: _controllers[index],
-                          focusNode: _focusNodes[index],
-                          textAlign: TextAlign.center,
-                          keyboardType: TextInputType.number,
-                          maxLength: 1,
-                          style: GoogleFonts.cinzel(
-                            color: AppTheme.gold,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          cursorColor: AppTheme.gold,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          decoration: InputDecoration(
-                            counterText: '',
-                            contentPadding:
-                                const EdgeInsets.symmetric(vertical: 12),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                  color: AppTheme.gold, width: 1.5),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                  color: AppTheme.gold, width: 2),
-                            ),
-                          ),
-                          onChanged: (value) => _onDigitChanged(index, value),
-                        ),
+                // OTP text field
+                SizedBox(
+                  width: 200,
+                  child: TextFormField(
+                    controller: _otpController,
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    style: const TextStyle(
+                      color: AppTheme.gold,
+                      fontSize: 22,
+                      fontFamily: 'Georgia',
+                      fontWeight: FontWeight.normal,
+                      letterSpacing: 12,
+                    ),
+                    cursorColor: AppTheme.gold,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    decoration: InputDecoration(
+                      counterText: '',
+                      hintText: '000000',
+                      hintStyle: TextStyle(
+                        color: AppTheme.gold.withValues(alpha: 0.3),
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 12,
                       ),
-                    );
-                  }),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                            color: AppTheme.gold, width: 1.5),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                            color: AppTheme.gold, width: 2),
+                      ),
+                    ),
+                    onChanged: (_) {
+                      if (_errorMessage != null) {
+                        setState(() => _errorMessage = null);
+                      }
+                    },
+                  ),
                 ),
                 const SizedBox(height: 12),
 

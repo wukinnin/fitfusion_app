@@ -30,20 +30,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     if (value == null || value.isEmpty) {
       return 'Password is required';
     }
-    if (value.length < 8) {
-      return 'Must be at least 8 characters';
-    }
-    if (!RegExp(r'[A-Z]').hasMatch(value)) {
-      return 'Must contain at least 1 uppercase letter';
-    }
-    if (!RegExp(r'[a-z]').hasMatch(value)) {
-      return 'Must contain at least 1 lowercase letter';
-    }
-    if (!RegExp(r'[0-9]').hasMatch(value)) {
-      return 'Must contain at least 1 number';
-    }
-    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/`~;]').hasMatch(value)) {
-      return 'Must contain at least 1 special character';
+    if (value.length < 10) {
+      return 'Must be at least 10 characters';
     }
     return null;
   }
@@ -239,7 +227,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       validator: validator,
       obscureText: obscureText,
       textInputAction: textInputAction,
-      style: GoogleFonts.cinzel(color: AppTheme.gold, fontSize: 14),
+      style: const TextStyle(
+        color: AppTheme.gold,
+        fontSize: 14,
+        fontFamily: 'Georgia',
+        fontWeight: FontWeight.normal,
+      ),
       cursorColor: AppTheme.gold,
       decoration: InputDecoration(
         isDense: true,
@@ -262,7 +255,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppTheme.crimson, width: 2),
         ),
-        errorStyle: GoogleFonts.cinzel(
+        errorStyle: const TextStyle(
           color: AppTheme.brightGold,
           fontSize: 11,
         ),
