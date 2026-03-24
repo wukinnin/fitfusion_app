@@ -14,7 +14,9 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+        // TODO: Check if user is already logged in
+        // If logged in → '/home', otherwise → '/auth'
+        Navigator.pushReplacementNamed(context, '/auth');
       }
     });
   }
