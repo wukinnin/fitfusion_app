@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'core/theme.dart';
 import 'features/screens/achievements_screen.dart';
 import 'features/screens/auth/auth_landing_screen.dart';
+import 'features/screens/auth/forgot_password_screen.dart';
 import 'features/screens/auth/login_screen.dart';
 import 'features/screens/auth/reset_password_screen.dart';
 import 'features/screens/auth/signup_screen.dart';
@@ -30,6 +31,7 @@ class FitFusionApp extends StatelessWidget {
         '/auth/login': (context) => const LoginScreen(),
         '/auth/signup': (context) => const SignupScreen(),
         '/auth/verify': (context) => const VerifyEmailScreen(),
+        '/auth/forgot-password': (context) => const ForgotPasswordScreen(),
         '/auth/reset-password': (context) => const ResetPasswordScreen(),
         '/home': (context) => const HomeScreen(),
         '/select': (context) => const WorkoutSelectScreen(),

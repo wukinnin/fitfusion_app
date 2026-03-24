@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
 
@@ -19,16 +22,51 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   bool _isResending = false;
   String? _errorMessage;
 
+  int _resendCooldown = 0;
+  Timer? _cooldownTimer;
+
+  void _startCooldown() {
+    _resendCooldown = 30;
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _resendCooldown--;
+          if (_resendCooldown <= 0) {
+            timer.cancel();
+          }
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
   @override
   void dispose() {
     _otpController.dispose();
+    _cooldownTimer?.cancel();
     super.dispose();
+  }
+
+  String _email = '';
+  String _type = 'signup'; // 'signup' or 'recovery'
+  bool _argsParsed = false;
+
+  void _parseArgs() {
+    if (_argsParsed) return;
+    _argsParsed = true;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map<String, String>) {
+      _email = args['email'] ?? '';
+      _type = args['type'] ?? 'signup';
+    }
   }
 
   Future<void> _handleVerify() async {
     final code = _otpController.text.trim();
-    if (code.length != 6) {
-      setState(() => _errorMessage = 'Please enter all 6 digits');
+    if (code.length < 6) {
+      setState(() => _errorMessage = 'Please enter at least 6 digits');
       return;
     }
 
@@ -37,20 +75,62 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       _errorMessage = null;
     });
 
-    // TODO: Implement Supabase OTP verification
-    // 1. Call Supabase verifyOTP with email + code
-    // 2. On success, navigate to login
-    // 3. On failure, show error
+    final supabase = Supabase.instance.client;
 
-    await Future.delayed(const Duration(seconds: 1)); // Placeholder delay
+    try {
+      final otpType = _type == 'recovery' ? OtpType.recovery : OtpType.signup;
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        '/auth/login',
-        (route) => route.settings.name == '/auth',
+      await supabase.auth.verifyOTP(
+        email: _email,
+        token: code,
+        type: otpType,
       );
+
+      if (_type == 'signup') {
+        // Mark email as verified in public.users
+        final userId = supabase.auth.currentUser?.id;
+        if (userId != null) {
+          await supabase
+              .from('users')
+              .update({'is_email_verified': true})
+              .eq('id', userId);
+        }
+        // Sign out so user logs in fresh
+        await supabase.auth.signOut();
+      }
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (_type == 'recovery') {
+          // Recovery: proceed to reset password screen
+          Navigator.pushReplacementNamed(
+            context,
+            '/auth/reset-password',
+            arguments: _email,
+          );
+        } else {
+          // Signup: go to login
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/auth/login',
+            (route) => route.settings.name == '/auth',
+          );
+        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.message;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Verification failed';
+        });
+      }
     }
   }
 
@@ -60,26 +140,44 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       _errorMessage = null;
     });
 
-    // TODO: Implement Supabase resend OTP
-    await Future.delayed(const Duration(seconds: 1)); // Placeholder delay
+    final supabase = Supabase.instance.client;
 
-    if (mounted) {
-      setState(() => _isResending = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Verification code resent',
-            style: GoogleFonts.cinzel(color: AppTheme.bloodRed),
+    try {
+      if (_type == 'recovery') {
+        await supabase.auth.resetPasswordForEmail(_email);
+      } else {
+        await supabase.auth.resend(type: OtpType.signup, email: _email);
+      }
+
+      if (mounted) {
+        setState(() => _isResending = false);
+        _startCooldown();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Verification code resent',
+              style: GoogleFonts.cinzel(color: AppTheme.bloodRed),
+            ),
+            backgroundColor: AppTheme.gold,
           ),
-          backgroundColor: AppTheme.gold,
-        ),
-      );
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isResending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to resend code'),
+            backgroundColor: AppTheme.crimson,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final email = ModalRoute.of(context)?.settings.arguments as String? ?? '';
+    _parseArgs();
 
     return Scaffold(
       backgroundColor: AppTheme.bloodRed,
@@ -99,9 +197,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                if (email.isNotEmpty)
+                if (_email.isNotEmpty)
                   Text(
-                    'Code sent to $email',
+                    'Code sent to $_email',
                     style: GoogleFonts.cinzel(
                       color: AppTheme.creamWhite,
                       fontSize: 12,
@@ -112,12 +210,12 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
                 // OTP text field
                 SizedBox(
-                  width: 200,
+                  width: 280,
                   child: TextFormField(
                     controller: _otpController,
                     textAlign: TextAlign.center,
                     keyboardType: TextInputType.number,
-                    maxLength: 6,
+                    maxLength: 9,
                     style: const TextStyle(
                       color: AppTheme.gold,
                       fontSize: 22,
@@ -131,13 +229,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                     ],
                     decoration: InputDecoration(
                       counterText: '',
-                      hintText: '000000',
-                      hintStyle: TextStyle(
-                        color: AppTheme.gold.withValues(alpha: 0.3),
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 12,
-                      ),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 14),
                       enabledBorder: OutlineInputBorder(
@@ -206,11 +297,19 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
                 // Resend Code
                 GestureDetector(
-                  onTap: _isResending ? null : _handleResendCode,
+                  onTap: (_isResending || _resendCooldown > 0)
+                      ? null
+                      : _handleResendCode,
                   child: Text(
-                    _isResending ? 'SENDING...' : 'RESEND CODE',
+                    _isResending
+                        ? 'SENDING...'
+                        : _resendCooldown > 0
+                            ? 'RESEND CODE (${_resendCooldown}s)'
+                            : 'RESEND CODE',
                     style: GoogleFonts.cinzel(
-                      color: AppTheme.gold,
+                      color: _resendCooldown > 0
+                          ? AppTheme.gold.withValues(alpha: 0.4)
+                          : AppTheme.gold,
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1,

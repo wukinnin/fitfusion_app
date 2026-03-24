@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
 
@@ -51,30 +52,54 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     setState(() => _isLoading = true);
 
-    // TODO: Implement Supabase password reset logic
-    // 1. Call Supabase updateUser with new password
-    // 2. On success, navigate to login
-    // 3. On failure, show error
+    final supabase = Supabase.instance.client;
+    final newPassword = _passwordController.text;
 
-    await Future.delayed(const Duration(seconds: 1)); // Placeholder delay
+    try {
+      await supabase.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Password reset successfully',
-            style: GoogleFonts.cinzel(color: AppTheme.bloodRed),
+      // Sign out so user logs in with new password
+      await supabase.auth.signOut();
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Password reset successfully',
+              style: GoogleFonts.cinzel(color: AppTheme.bloodRed),
+            ),
+            backgroundColor: AppTheme.gold,
           ),
-          backgroundColor: AppTheme.gold,
-        ),
-      );
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        '/auth/login',
-        (route) => route.settings.name == '/auth',
-      );
+        );
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/auth/login',
+          (route) => route.settings.name == '/auth',
+        );
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError(e.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError('An unexpected error occurred');
+      }
     }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.crimson,
+      ),
+    );
   }
 
   @override
@@ -136,7 +161,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Minimum 10 characters',
+                    style: TextStyle(
+                      color: AppTheme.creamWhite.withValues(alpha: 0.6),
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // Confirm Password
                   _buildLabel('CONFIRM PASSWORD'),

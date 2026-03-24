@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -14,9 +15,12 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
-        // TODO: Check if user is already logged in
-        // If logged in → '/home', otherwise → '/auth'
-        Navigator.pushReplacementNamed(context, '/auth');
+        final session = Supabase.instance.client.auth.currentSession;
+        if (session != null) {
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          Navigator.pushReplacementNamed(context, '/auth');
+        }
       }
     });
   }
