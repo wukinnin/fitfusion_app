@@ -85,7 +85,7 @@ flutter:
     - assets/audio/sfx/
 
     # --- Images (Flame looks for assets/images/) ---
-    - assets/images/logo.png
+    - assets/images/game/
     - assets/images/monsters/
     
   # An image asset can refer to one or more resolution-specific "variants", see

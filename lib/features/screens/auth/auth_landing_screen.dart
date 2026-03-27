@@ -18,7 +18,7 @@ class AuthLandingScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Image.asset(
-                  'assets/images/logo.png',
+                  'assets/images/game/logo.png',
                   width: 180,
                   height: 180,
                 ),

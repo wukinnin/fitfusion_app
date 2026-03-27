@@ -1,10 +1,12 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/enums.dart';
 import '../fitfusion_game.dart';
 
 enum _CooldownPhase { slideIn, countdown, slideOut }
@@ -12,6 +14,8 @@ enum _CooldownPhase { slideIn, countdown, slideOut }
 class CooldownOverlay extends PositionComponent with HasGameReference<FitFusionGame> {
   static const double slideInDuration = 1.0;
   static const double slideOutDuration = 1.0;
+
+  final Map<WorkoutType, ui.Image> _exerciseImages = {};
 
   _CooldownPhase _phase = _CooldownPhase.slideIn;
   double _phaseTimer = 0;
@@ -50,6 +54,18 @@ class CooldownOverlay extends PositionComponent with HasGameReference<FitFusionG
   }
 
   bool get isActive => _isActive;
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+
+    _exerciseImages[WorkoutType.squats] =
+        await game.images.load('game/squats.png');
+    _exerciseImages[WorkoutType.jumpingJacks] =
+        await game.images.load('game/jumping-jacks.png');
+    _exerciseImages[WorkoutType.obliqueCrunches] =
+        await game.images.load('game/side-crunches.png');
+  }
 
   @override
   void update(double dt) {
@@ -187,6 +203,42 @@ class CooldownOverlay extends PositionComponent with HasGameReference<FitFusionG
       canvas,
       Offset(centerX - countTp.width / 2, centerY - countTp.height / 2),
     );
+
+    // Exercise illustration — below timer (contain-fit, no stretching)
+    final image = _exerciseImages[game.workoutType];
+    if (image != null) {
+      final imageTop = centerY + circleRadius + 24;
+      final maxWidth = math.min(screenW * 0.6, 280.0);
+      final maxHeight = math.min(screenH * 0.28, 200.0);
+
+      final imageAspect = image.width / image.height;
+      final boxAspect = maxWidth / maxHeight;
+
+      late final double drawWidth;
+      late final double drawHeight;
+      if (imageAspect > boxAspect) {
+        drawWidth = maxWidth;
+        drawHeight = maxWidth / imageAspect;
+      } else {
+        drawHeight = maxHeight;
+        drawWidth = maxHeight * imageAspect;
+      }
+
+      final dstRect = Rect.fromLTWH(
+        centerX - drawWidth / 2,
+        imageTop,
+        drawWidth,
+        drawHeight,
+      );
+      final srcRect = Rect.fromLTWH(
+        0,
+        0,
+        image.width.toDouble(),
+        image.height.toDouble(),
+      );
+
+      canvas.drawImageRect(image, srcRect, dstRect, Paint());
+    }
 
     canvas.restore();
   }
