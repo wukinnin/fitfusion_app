@@ -52,10 +52,8 @@ extension AchievementIdExtension on AchievementId {
       case AchievementId.tripleCrown:          return 7;
       case AchievementId.speedDemon:           return 8;
       case AchievementId.blindingSteel:        return 9;
-      case AchievementId.recordBreaker:        return 10;
-      case AchievementId.sharperThanYesterday: return 11;
-      case AchievementId.untouchable:          return 12;
-      case AchievementId.lastStand:            return 13;
+      case AchievementId.untouchable:          return 10;
+      case AchievementId.lastStand:            return 11;
     }
   }
 
@@ -71,8 +69,6 @@ extension AchievementIdExtension on AchievementId {
       case AchievementId.tripleCrown:          return 'triple_crown';
       case AchievementId.speedDemon:           return 'speed_demon';
       case AchievementId.blindingSteel:        return 'blinding_steel';
-      case AchievementId.recordBreaker:        return 'record_breaker';
-      case AchievementId.sharperThanYesterday: return 'sharper_than_yesterday';
       case AchievementId.untouchable:          return 'untouchable';
       case AchievementId.lastStand:            return 'last_stand';
     }
@@ -89,8 +85,6 @@ extension AchievementIdExtension on AchievementId {
       case AchievementId.tripleCrown:          return 'Triple Crown';
       case AchievementId.speedDemon:           return 'Speed Demon';
       case AchievementId.blindingSteel:        return 'Blinding Steel';
-      case AchievementId.recordBreaker:        return 'Record Breaker';
-      case AchievementId.sharperThanYesterday: return 'Sharper Than Yesterday';
       case AchievementId.untouchable:          return 'Untouchable';
       case AchievementId.lastStand:            return 'Last Stand';
     }
@@ -107,8 +101,6 @@ extension AchievementIdExtension on AchievementId {
       case AchievementId.tripleCrown:          return 'Win at least one session in all 3 workout types.';
       case AchievementId.speedDemon:           return 'Achieve a best rep interval under 1.8 seconds.';
       case AchievementId.blindingSteel:        return 'Win with an average rep interval under 2.3 sec.';
-      case AchievementId.recordBreaker:        return 'Beat your personal best clear time.';
-      case AchievementId.sharperThanYesterday: return 'Beat your personal best rep interval.';
       case AchievementId.untouchable:          return 'Win with 0 lives lost.';
       case AchievementId.lastStand:            return 'Win with exactly 2 lives lost.';
     }

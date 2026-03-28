@@ -51,7 +51,7 @@ enum LeaderboardMetric {
   avgRepInterval,
 }
 
-/// IDs for all 13 achievements — ordered by index in the README table.
+/// IDs for all 11 achievements — ordered by index in the README table.
 /// Local persistence uses SharedPreferences until Supabase integration.
 enum AchievementId {
   firstBlood,           // #1  — Complete your first session
@@ -63,8 +63,6 @@ enum AchievementId {
   tripleCrown,          // #7  — Win at least one session in all 3 workout types
   speedDemon,           // #8  — Best rep interval under 1.8 seconds
   blindingSteel,        // #9  — Win with avg rep interval under 2.3 sec
-  recordBreaker,        // #10 — Beat your personal best clear time
-  sharperThanYesterday, // #11 — Beat your personal best rep interval
-  untouchable,          // #12 — Win with 0 lives lost
-  lastStand,            // #13 — Win with exactly 2 lives lost
+  untouchable,          // #10 — Win with 0 lives lost
+  lastStand,            // #11 — Win with exactly 2 lives lost
 }

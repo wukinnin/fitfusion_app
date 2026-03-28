@@ -47,7 +47,7 @@ class AchievementService {
     return result;
   }
 
-  /// Evaluates all 13 achievements against the completed session.
+  /// Evaluates all 11 achievements against the completed session.
   /// Updates lifetime stats FIRST, then checks conditions.
   /// Returns the list of NEWLY unlocked achievements (empty if none).
   Future<List<AchievementId>> evaluateSession(GameSession session) async {
@@ -71,14 +71,11 @@ class AchievementService {
     // PB clear time — only for winning sessions
     final pbTimeKey = _pbTimeKeyForWorkout(session.workoutType);
     final previousPbTime = _prefs.getDouble(pbTimeKey) ?? 0.0;
-    bool beatPbTime = false;
-
     if (session.won) {
       if (previousPbTime <= 0.0) {
-        // First win — set the PB but do NOT award Record Breaker
+        // First win — initialize PB clear time
         await _prefs.setDouble(pbTimeKey, session.totalTimeSeconds);
       } else if (session.totalTimeSeconds < previousPbTime) {
-        beatPbTime = true;
         await _prefs.setDouble(pbTimeKey, session.totalTimeSeconds);
       }
     }
@@ -86,14 +83,11 @@ class AchievementService {
     // PB rep interval — any session with valid intervals
     final pbIntervalKey = _pbIntervalKeyForWorkout(session.workoutType);
     final previousPbInterval = _prefs.getDouble(pbIntervalKey) ?? 0.0;
-    bool beatPbInterval = false;
-
     if (session.bestRepIntervalSeconds > 0) {
       if (previousPbInterval <= 0.0) {
-        // First recorded interval — set PB, do NOT award Sharper Than Yesterday
+        // First recorded interval — initialize PB rep interval
         await _prefs.setDouble(pbIntervalKey, session.bestRepIntervalSeconds);
       } else if (session.bestRepIntervalSeconds < previousPbInterval) {
-        beatPbInterval = true;
         await _prefs.setDouble(pbIntervalKey, session.bestRepIntervalSeconds);
       }
     }
@@ -118,8 +112,6 @@ class AchievementService {
         squatVictories: squatVictories,
         jacksVictories: jacksVictories,
         crunchVictories: crunchVictories,
-        beatPbTime: beatPbTime,
-        beatPbInterval: beatPbInterval,
       );
 
       if (unlocked) {
@@ -148,8 +140,6 @@ class AchievementService {
     required int squatVictories,
     required int jacksVictories,
     required int crunchVictories,
-    required bool beatPbTime,
-    required bool beatPbInterval,
   }) {
     switch (id) {
       case AchievementId.firstBlood:
@@ -193,20 +183,12 @@ class AchievementService {
                session.avgRepIntervalSeconds > 0 &&
                session.avgRepIntervalSeconds < kBlindingSteelThreshold;
 
-      case AchievementId.recordBreaker:
-        // #10 — Beat your personal best clear time
-        return beatPbTime;
-
-      case AchievementId.sharperThanYesterday:
-        // #11 — Beat your personal best rep interval
-        return beatPbInterval;
-
       case AchievementId.untouchable:
-        // #12 — Win with 0 lives lost
+        // #10 — Win with 0 lives lost
         return session.won && session.livesLost == 0;
 
       case AchievementId.lastStand:
-        // #13 — Win with exactly 2 lives lost
+        // #11 — Win with exactly 2 lives lost
         return session.won && session.livesLost == 2;
     }
   }
