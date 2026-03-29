@@ -16,17 +16,13 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'FITFUSION',
-                  style: TextStyle(
-                    color: AppTheme.gold,
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 4,
-                    shadows: [Shadow(blurRadius: 8, color: Colors.black)],
-                  ),
+                // Logo
+                Image.asset(
+                  'assets/images/game/logo.png',
+                  height: 140,
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 24),
                 Text(
                   'Exercise is the Gameplay',
                   style: TextStyle(
@@ -108,6 +104,25 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     child: const Text('STATS',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Settings button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pushNamed(context, '/settings'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.gold,
+                      side: const BorderSide(color: AppTheme.gold, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('SETTINGS',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
                 ),

@@ -11,6 +11,12 @@ import 'features/screens/game_screen.dart';
 import 'features/screens/home_screen.dart';
 import 'features/screens/leaderboard_screen.dart';
 import 'features/screens/results_screen.dart';
+import 'features/screens/settings/change_email_screen.dart';
+import 'features/screens/settings/change_username_screen.dart';
+import 'features/screens/settings/delete_account_screen.dart';
+import 'features/screens/settings/edit_profile_screen.dart';
+import 'features/screens/settings/reset_password_settings_screen.dart';
+import 'features/screens/settings_screen.dart';
 import 'features/screens/splash_screen.dart';
 import 'features/screens/stats_screen.dart';
 import 'features/screens/workout_select_screen.dart';
@@ -40,6 +46,12 @@ class FitFusionApp extends StatelessWidget {
         '/leaderboard': (context) => const LeaderboardScreen(),
         '/stats': (context) => const StatsScreen(),
         '/achievements': (context) => const AchievementsScreen(),
+        '/settings': (context) => const SettingsScreen(),
+        '/settings/edit-profile': (context) => const EditProfileScreen(),
+        '/settings/reset-password': (context) => const ResetPasswordSettingsScreen(),
+        '/settings/change-username': (context) => const ChangeUsernameScreen(),
+        '/settings/change-email': (context) => const ChangeEmailScreen(),
+        '/settings/delete-account': (context) => const DeleteAccountScreen(),
       },
     );
   }

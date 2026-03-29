@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/enums.dart';
 import '../../core/theme.dart';
+import '../../services/session_service.dart';
 import '../../widgets/camera_preview_widget.dart';
 import '../../widgets/pose_overlay_painter.dart';
 import '../achievements/achievement_service.dart';
@@ -41,6 +42,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   String? _error;
   bool _permissionDenied = false;
   bool _sessionEnded = false;
+  bool _isSaving = false;
 
   WorkoutType _workoutType = WorkoutType.squats;
 
@@ -128,24 +130,81 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _onSessionComplete(GameSession session) {
     if (_sessionEnded) return;
     _sessionEnded = true;
+    _saveAndNavigate(session);
+  }
 
-    // Evaluate achievements and show popups before navigating
-    _achievementService.evaluateSession(session).then((newlyUnlocked) {
-      if (newlyUnlocked.isNotEmpty && _game != null) {
-        for (final _ in newlyUnlocked) {
-          _game!.showAchievementPopup();
+  Future<void> _saveAndNavigate(GameSession session) async {
+    // Show saving indicator
+    if (mounted) setState(() => _isSaving = true);
+
+    // 1. Save session to Supabase (DB trigger updates user_stats + leaderboards)
+    bool saved = false;
+    while (!saved) {
+      try {
+        await SessionService.saveSession(session);
+        saved = true;
+      } on SessionSaveException catch (e) {
+        assert(() {
+          debugPrint('[GameScreen] Session save failed: $e');
+          return true;
+        }());
+        // Show retry dialog
+        final retry = await _showSaveErrorDialog();
+        if (!retry) {
+          // User chose to skip — navigate without saving
+          if (mounted) setState(() => _isSaving = false);
+          _navigateToResults(session);
+          return;
         }
-        // Delay navigation so popups are visible (3s popup duration + buffer)
-        Future.delayed(const Duration(milliseconds: 3500), () {
-          _navigateToResults(session);
-        });
-      } else {
-        // No achievements — navigate immediately
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _navigateToResults(session);
-        });
       }
-    });
+    }
+
+    if (mounted) setState(() => _isSaving = false);
+
+    // 2. Evaluate achievements (reads freshly updated user_stats from DB)
+    final newlyUnlocked = await _achievementService.evaluateSession(session);
+
+    // 3. Show achievement popups
+    if (newlyUnlocked.isNotEmpty && _game != null) {
+      for (final _ in newlyUnlocked) {
+        _game!.showAchievementPopup();
+      }
+      // Delay navigation so popups are visible (3s popup duration + buffer)
+      await Future.delayed(const Duration(milliseconds: 3500));
+    }
+
+    // 4. Navigate to results
+    _navigateToResults(session);
+  }
+
+  Future<bool> _showSaveErrorDialog() async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.bloodRed,
+        title: const Text(
+          'Save Failed',
+          style: TextStyle(color: AppTheme.gold, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Could not save your session. Check your connection and try again.',
+          style: TextStyle(color: AppTheme.creamWhite),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Skip', style: TextStyle(color: AppTheme.creamWhite)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Retry', style: TextStyle(color: AppTheme.gold)),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   void _navigateToResults(GameSession session) {
@@ -266,6 +325,30 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
             // Layer 3: Flame game with transparent background
             GameWidget(game: _game!),
+
+            // Layer 4: Saving overlay
+            if (_isSaving)
+              Container(
+                color: Colors.black.withValues(alpha: 0.6),
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: AppTheme.gold),
+                      SizedBox(height: 16),
+                      Text(
+                        'Saving...',
+                        style: TextStyle(
+                          color: AppTheme.gold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          shadows: [Shadow(blurRadius: 6, color: Colors.black)],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

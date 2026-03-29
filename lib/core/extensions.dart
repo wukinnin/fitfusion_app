@@ -40,7 +40,7 @@ extension WorkoutTypeExtension on WorkoutType {
 }
 
 extension AchievementIdExtension on AchievementId {
-  /// 1-based display index matching the README achievements table order.
+  /// IDs for all 11 achievements — ordered by index in the README table.
   int get index {
     switch (this) {
       case AchievementId.firstBlood:           return 1;
@@ -113,7 +113,6 @@ extension LeaderboardMetricExtension on LeaderboardMetric {
     switch (this) {
       case LeaderboardMetric.clearTime:        return 'clear_time';
       case LeaderboardMetric.bestRepInterval:  return 'best_rep_interval';
-      case LeaderboardMetric.avgRepInterval:   return 'avg_rep_interval';
     }
   }
 
@@ -122,7 +121,6 @@ extension LeaderboardMetricExtension on LeaderboardMetric {
     switch (this) {
       case LeaderboardMetric.clearTime:        return 'Clear Time';
       case LeaderboardMetric.bestRepInterval:  return 'Best Rep Interval';
-      case LeaderboardMetric.avgRepInterval:   return 'Avg Rep Interval';
     }
   }
 }

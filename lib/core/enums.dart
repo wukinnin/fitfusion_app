@@ -36,8 +36,8 @@ enum PaceEventType {
   paceFailed,
 }
 
-/// The three leaderboard metrics tracked per workout type.
-/// Matches the CHECK constraint on leaderboard_entries.metric in DATABASE.md.
+/// The two per-workout leaderboard metrics.
+/// Matches the CHECK constraint on leaderboard_entries.metric.
 enum LeaderboardMetric {
   /// Fastest time to complete a full 10-round winning session (seconds).
   /// Only from won sessions.
@@ -45,10 +45,6 @@ enum LeaderboardMetric {
 
   /// Fastest single rep interval recorded across all sessions (seconds).
   bestRepInterval,
-
-  /// Lowest average rep interval in a single session (seconds).
-  /// Only from sessions with at least 2 reps.
-  avgRepInterval,
 }
 
 /// IDs for all 11 achievements — ordered by index in the README table.
