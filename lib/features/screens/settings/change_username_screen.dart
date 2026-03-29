@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
 
@@ -15,6 +16,7 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
   final _newUsernameController = TextEditingController();
   final _confirmUsernameController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -22,6 +24,93 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
     _newUsernameController.dispose();
     _confirmUsernameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleChangeUsername() async {
+    final currentPw = _currentPasswordController.text;
+    final newUsername = _newUsernameController.text.trim();
+    final confirmUsername = _confirmUsernameController.text.trim();
+
+    if (currentPw.isEmpty || newUsername.isEmpty || confirmUsername.isEmpty) {
+      _showError('All fields are required');
+      return;
+    }
+    if (newUsername.length < 3) {
+      _showError('Username must be at least 3 characters');
+      return;
+    }
+    if (newUsername != confirmUsername) {
+      _showError('Usernames do not match');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final supabase = Supabase.instance.client;
+    final email = supabase.auth.currentUser!.email!;
+    final userId = supabase.auth.currentUser!.id;
+
+    try {
+      // Re-authenticate with current password
+      await supabase.auth.signInWithPassword(email: email, password: currentPw);
+
+      // Check username uniqueness (case-insensitive) via RPC
+      final existingEmail = await supabase.rpc(
+        'get_email_by_username',
+        params: {'p_username': newUsername},
+      );
+      if (existingEmail != null) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _showError('Username is already taken');
+        }
+        return;
+      }
+
+      // Update username in public.users table
+      await supabase
+          .from('users')
+          .update({'username': newUsername})
+          .eq('id', userId);
+
+      // Update auth user metadata
+      await supabase.auth.updateUser(
+        UserAttributes(data: {'username': newUsername}),
+      );
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Username updated successfully',
+              style: GoogleFonts.cinzel(color: AppTheme.bloodRed),
+            ),
+            backgroundColor: AppTheme.gold,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError(e.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError('An unexpected error occurred');
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.crimson,
+      ),
+    );
   }
 
   @override
@@ -103,9 +192,7 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
             SizedBox(
               height: 52,
               child: ElevatedButton(
-                onPressed: () {
-                  // Visual only — no action
-                },
+                onPressed: _isLoading ? null : _handleChangeUsername,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.gold,
                   foregroundColor: AppTheme.bloodRed,
@@ -113,10 +200,19 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'CHANGE USERNAME',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: AppTheme.bloodRed,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'CHANGE USERNAME',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
 
@@ -15,6 +16,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
   final _newEmailController = TextEditingController();
   final _confirmEmailController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -22,6 +24,74 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
     _newEmailController.dispose();
     _confirmEmailController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleChangeEmail() async {
+    final currentPw = _currentPasswordController.text;
+    final newEmail = _newEmailController.text.trim();
+    final confirmEmail = _confirmEmailController.text.trim();
+
+    if (currentPw.isEmpty || newEmail.isEmpty || confirmEmail.isEmpty) {
+      _showError('All fields are required');
+      return;
+    }
+
+    final emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,}$');
+    if (!emailRegex.hasMatch(newEmail)) {
+      _showError('Enter a valid email address');
+      return;
+    }
+
+    if (newEmail != confirmEmail) {
+      _showError('Emails do not match');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final supabase = Supabase.instance.client;
+    final email = supabase.auth.currentUser!.email!;
+
+    try {
+      // Re-authenticate with current password
+      await supabase.auth.signInWithPassword(email: email, password: currentPw);
+
+      // Update email — Supabase sends confirmation to both old and new email
+      await supabase.auth.updateUser(UserAttributes(email: newEmail));
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Confirmation sent to new email. Check your inbox.',
+              style: GoogleFonts.cinzel(color: AppTheme.bloodRed),
+            ),
+            backgroundColor: AppTheme.gold,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError(e.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError('An unexpected error occurred');
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.crimson,
+      ),
+    );
   }
 
   @override
@@ -105,9 +175,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
             SizedBox(
               height: 52,
               child: ElevatedButton(
-                onPressed: () {
-                  // Visual only — no action
-                },
+                onPressed: _isLoading ? null : _handleChangeEmail,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.gold,
                   foregroundColor: AppTheme.bloodRed,
@@ -115,10 +183,19 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'CHANGE EMAIL',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: AppTheme.bloodRed,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'CHANGE EMAIL',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 
@@ -13,6 +14,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _showTutorial = true;
   double _volume = 0.8;
+
+  Future<void> _handleLogOut() async {
+    await Supabase.instance.client.auth.signOut();
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,9 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.logout,
               label: 'Log Out',
               color: AppTheme.crimson,
-              onTap: () {
-                // Visual only — no action
-              },
+              onTap: () => _handleLogOut(),
             ),
           ],
         ),

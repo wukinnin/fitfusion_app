@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
 
@@ -19,6 +20,7 @@ class _ResetPasswordSettingsScreenState
   bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -26,6 +28,71 @@ class _ResetPasswordSettingsScreenState
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleChangePassword() async {
+    final currentPw = _currentPasswordController.text;
+    final newPw = _newPasswordController.text;
+    final confirmPw = _confirmPasswordController.text;
+
+    if (currentPw.isEmpty || newPw.isEmpty || confirmPw.isEmpty) {
+      _showError('All fields are required');
+      return;
+    }
+    if (newPw.length < 10) {
+      _showError('New password must be at least 10 characters');
+      return;
+    }
+    if (newPw != confirmPw) {
+      _showError('New passwords do not match');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final supabase = Supabase.instance.client;
+    final email = supabase.auth.currentUser!.email!;
+
+    try {
+      // Re-authenticate with current password
+      await supabase.auth.signInWithPassword(email: email, password: currentPw);
+
+      // Update password
+      await supabase.auth.updateUser(UserAttributes(password: newPw));
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Password updated successfully',
+              style: GoogleFonts.cinzel(color: AppTheme.bloodRed),
+            ),
+            backgroundColor: AppTheme.gold,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError(e.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError('An unexpected error occurred');
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.crimson,
+      ),
+    );
   }
 
   @override
@@ -87,9 +154,7 @@ class _ResetPasswordSettingsScreenState
             SizedBox(
               height: 52,
               child: ElevatedButton(
-                onPressed: () {
-                  // Visual only — no action
-                },
+                onPressed: _isLoading ? null : _handleChangePassword,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.gold,
                   foregroundColor: AppTheme.bloodRed,
@@ -97,10 +162,19 @@ class _ResetPasswordSettingsScreenState
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'CHANGE PASSWORD',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: AppTheme.bloodRed,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'CHANGE PASSWORD',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],
