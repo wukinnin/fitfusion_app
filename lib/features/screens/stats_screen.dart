@@ -71,7 +71,18 @@ class _StatsScreenState extends State<StatsScreen>
     );
   }
 
+  // Dummy stats for the logged-in player (Vex_Machina) — matches portal dummyData.js
+  static const _dummyStats = {
+    'squats':   { 'fastestClear': '03:42.110', 'avgClear': '04:15.330', 'bestInterval': '1.62s', 'avgInterval': '2.04s', 'victories': '18', 'defeats': '5', 'rounds': '195', 'reps': '1105' },
+    'jacks':    { 'fastestClear': '04:01.220', 'avgClear': '04:38.510', 'bestInterval': '1.78s', 'avgInterval': '2.21s', 'victories': '12', 'defeats': '4', 'rounds': '140', 'reps': '820' },
+    'crunches': { 'fastestClear': '04:18.450', 'avgClear': '04:52.110', 'bestInterval': '1.85s', 'avgInterval': '2.35s', 'victories': '10', 'defeats': '3', 'rounds': '120', 'reps': '710' },
+  };
+  static const _workoutKeyByTab = ['squats', 'jacks', 'crunches'];
+
   Widget _buildWorkoutStatsTab() {
+    final tabIndex = _tabController.index.clamp(0, 2);
+    final key = _workoutKeyByTab[tabIndex];
+    final s = _dummyStats[key]!;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -79,17 +90,17 @@ class _StatsScreenState extends State<StatsScreen>
         children: [
           _buildSectionHeader('SESSION STATS'),
           const SizedBox(height: 8),
-          _buildStatCard('Fastest Clear Time', '--'),
-          _buildStatCard('Average Clear Time', '--'),
-          _buildStatCard('Best Rep Interval', '--'),
-          _buildStatCard('Average Rep Interval', '--'),
+          _buildStatCard('Fastest Clear Time', s['fastestClear']!),
+          _buildStatCard('Average Clear Time', s['avgClear']!),
+          _buildStatCard('Best Rep Interval', s['bestInterval']!),
+          _buildStatCard('Average Rep Interval', s['avgInterval']!),
           const SizedBox(height: 24),
           _buildSectionHeader('LIFETIME STATS'),
           const SizedBox(height: 8),
-          _buildStatCard('Rounds Completed', '0'),
-          _buildStatCard('Reps Finished', '0'),
-          _buildStatCard('Victories', '0'),
-          _buildStatCard('Defeats', '0'),
+          _buildStatCard('Rounds Completed', s['rounds']!),
+          _buildStatCard('Reps Finished', s['reps']!),
+          _buildStatCard('Victories', s['victories']!),
+          _buildStatCard('Defeats', s['defeats']!),
         ],
       ),
     );
@@ -103,10 +114,10 @@ class _StatsScreenState extends State<StatsScreen>
         children: [
           _buildSectionHeader('LIFETIME TOTALS'),
           const SizedBox(height: 8),
-          _buildStatCard('Total Sessions', '0'),
-          _buildStatCard('Total Reps', '0'),
-          _buildStatCard('Total Rounds', '0'),
-          _buildStatCard('Total Victories', '0'),
+          _buildStatCard('Total Sessions', '52'),
+          _buildStatCard('Total Reps', '2635'),
+          _buildStatCard('Total Rounds', '455'),
+          _buildStatCard('Total Victories', '40'),
         ],
       ),
     );
