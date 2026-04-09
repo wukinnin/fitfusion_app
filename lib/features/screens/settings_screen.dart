@@ -12,11 +12,66 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  static final _client = Supabase.instance.client;
+
   bool _showTutorial = true;
   double _volume = 0.8;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+
+    try {
+      final row = await _client
+          .from('users')
+          .select('show_tutorial')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (row != null) {
+        _showTutorial = (row['show_tutorial'] as bool?) ?? true;
+      }
+    } catch (e) {
+      assert(() {
+        debugPrint('[SettingsScreen] Failed to load settings: $e');
+        return true;
+      }());
+    }
+
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _updateShowTutorial(bool value) async {
+    setState(() => _showTutorial = value);
+
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _client
+          .from('users')
+          .update({'show_tutorial': value})
+          .eq('id', user.id);
+    } catch (e) {
+      assert(() {
+        debugPrint('[SettingsScreen] Failed to update show_tutorial: $e');
+        return true;
+      }());
+    }
+  }
 
   Future<void> _handleLogOut() async {
-    await Supabase.instance.client.auth.signOut();
+    await _client.auth.signOut();
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
     }
@@ -42,7 +97,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,7 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildToggleTile(
               label: 'Show Tutorial at Startup',
               value: _showTutorial,
-              onChanged: (v) => setState(() => _showTutorial = v),
+              onChanged: _updateShowTutorial,
             ),
             const SizedBox(height: 16),
 

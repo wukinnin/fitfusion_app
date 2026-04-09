@@ -137,7 +137,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     // Show saving indicator
     if (mounted) setState(() => _isSaving = true);
 
-    // 1. Save session to Supabase (DB trigger updates user_stats + leaderboards)
+    // 1. Save session to Supabase
     bool saved = false;
     while (!saved) {
       try {
@@ -161,7 +161,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     if (mounted) setState(() => _isSaving = false);
 
-    // 2. Evaluate achievements (reads freshly updated user_stats from DB)
+    // 2. Evaluate achievements against session + lifetime stats views
     final newlyUnlocked = await _achievementService.evaluateSession(session);
 
     // 3. Show achievement popups

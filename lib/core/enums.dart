@@ -36,19 +36,7 @@ enum PaceEventType {
   paceFailed,
 }
 
-/// The two per-workout leaderboard metrics.
-/// Matches the CHECK constraint on leaderboard_entries.metric.
-enum LeaderboardMetric {
-  /// Fastest time to complete a full 10-round winning session (seconds).
-  /// Only from won sessions.
-  clearTime,
-
-  /// Fastest single rep interval recorded across all sessions (seconds).
-  bestRepInterval,
-}
-
 /// IDs for all 11 achievements — ordered by index in the README table.
-/// Local persistence uses SharedPreferences until Supabase integration.
 enum AchievementId {
   firstBlood,           // #1  — Complete your first session
   ironWill,             // #2  — Complete 30 total sessions

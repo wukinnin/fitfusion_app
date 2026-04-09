@@ -107,20 +107,3 @@ extension AchievementIdExtension on AchievementId {
   }
 }
 
-extension LeaderboardMetricExtension on LeaderboardMetric {
-  /// Database key matching the leaderboard_entries.metric CHECK constraint.
-  String get dbKey {
-    switch (this) {
-      case LeaderboardMetric.clearTime:        return 'clear_time';
-      case LeaderboardMetric.bestRepInterval:  return 'best_rep_interval';
-    }
-  }
-
-  /// Human-readable label for UI display.
-  String get displayName {
-    switch (this) {
-      case LeaderboardMetric.clearTime:        return 'Clear Time';
-      case LeaderboardMetric.bestRepInterval:  return 'Best Rep Interval';
-    }
-  }
-}

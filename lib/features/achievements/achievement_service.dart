@@ -7,33 +7,54 @@ import '../../core/extensions.dart';
 import '../game/game_session.dart';
 
 /// Supabase-backed achievement persistence and evaluation service.
-/// On init, loads the current user's unlocked achievements from user_achievements.
-/// On evaluateSession, reads freshly-updated user_stats from Supabase (written
-/// by the DB trigger after session insert), evaluates all 11 achievements,
-/// and writes any newly unlocked ones back to user_achievements.
+///
+/// Schema (schema-rev2):
+///   achievements        — master table (id, code, title, description)
+///   user_achievements   — junction table (user_id, achievement_id, unlocked_at)
+///   v_user_lifetime_stats — view aggregating sessions per user
+///
+/// On init, loads the current user's unlocked achievement codes from the
+/// user_achievements junction table joined with achievements.
+///
+/// On evaluateSession, queries lifetime stats from views + per-workout
+/// victories from sessions, evaluates all 11 achievement conditions,
+/// and inserts newly unlocked rows into user_achievements.
 class AchievementService {
   static final _client = Supabase.instance.client;
 
+  /// Cached set of unlocked achievement codes (e.g. 'first_blood').
   final Set<String> _unlocked = {};
+
+  /// Cached mapping of achievement code → achievement id (smallint PK).
+  /// Populated on first init so we can insert into user_achievements.
+  final Map<String, int> _codeToId = {};
 
   Future<void> init() async {
     final user = _client.auth.currentUser;
     if (user == null) return;
 
     try {
-      final row = await _client
+      // Load all achievement master rows (only 11 rows, safe to fetch all)
+      final allAchievements = await _client
+          .from('achievements')
+          .select('id, code');
+      for (final row in allAchievements) {
+        _codeToId[row['code'] as String] = row['id'] as int;
+      }
+
+      // Load this user's unlocked achievements via junction table
+      final rows = await _client
           .from('user_achievements')
-          .select()
-          .eq('user_id', user.id)
-          .maybeSingle();
+          .select('achievement_id, achievements(code)')
+          .eq('user_id', user.id);
 
-      if (row == null) return;
-
-      for (final id in AchievementId.values) {
-        if (row[id.dbKey] == true) {
-          _unlocked.add(id.dbKey);
+      for (final row in rows) {
+        final nested = row['achievements'];
+        if (nested is Map && nested['code'] != null) {
+          _unlocked.add(nested['code'] as String);
         }
       }
+
       assert(() {
         debugPrint('[AchievementService] Loaded ${_unlocked.length} unlocked achievements');
         return true;
@@ -57,37 +78,70 @@ class AchievementService {
   }
 
   /// Evaluates all 11 achievements after a session has been saved.
-  /// Reads user_stats from Supabase (already updated by DB trigger).
-  /// Writes newly unlocked achievements to user_achievements.
+  /// Queries lifetime stats from v_user_lifetime_stats view and
+  /// per-workout victories from sessions table.
+  /// Inserts newly unlocked rows into user_achievements junction table.
   /// Returns the list of NEWLY unlocked achievements (empty if none).
   Future<List<AchievementId>> evaluateSession(GameSession session) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
 
-    // --- Fetch updated stats from DB (trigger has already run) ---
-    Map<String, dynamic>? stats;
+    // --- Fetch lifetime stats from view ---
+    int lifetimeSessions = 0;
+    int lifetimeReps = 0;
+    int lifetimeRounds = 0;
+
     try {
-      stats = await _client
-          .from('user_stats')
+      final stats = await _client
+          .from('v_user_lifetime_stats')
           .select()
           .eq('user_id', user.id)
           .maybeSingle();
+
+      if (stats != null) {
+        lifetimeSessions = (stats['total_sessions'] as int?) ?? 0;
+        lifetimeReps = (stats['total_reps'] as int?) ?? 0;
+        lifetimeRounds = (stats['total_rounds'] as int?) ?? 0;
+      }
     } catch (e) {
       assert(() {
-        debugPrint('[AchievementService] Failed to fetch user_stats: $e');
+        debugPrint('[AchievementService] Failed to fetch lifetime stats: $e');
         return true;
       }());
       return [];
     }
 
-    if (stats == null) return [];
+    // --- Fetch per-workout victory counts for Triple Crown ---
+    int squatVictories = 0;
+    int jacksVictories = 0;
+    int crunchVictories = 0;
 
-    final lifetimeSessions = (stats['total_sessions'] as int?) ?? 0;
-    final lifetimeReps     = (stats['total_reps'] as int?) ?? 0;
-    final lifetimeRounds   = (stats['total_rounds'] as int?) ?? 0;
-    final squatVictories   = (stats['squats_victories'] as int?) ?? 0;
-    final jacksVictories   = (stats['jacks_victories'] as int?) ?? 0;
-    final crunchVictories  = (stats['crunches_victories'] as int?) ?? 0;
+    try {
+      final victories = await _client
+          .from('sessions')
+          .select('workout_type')
+          .eq('user_id', user.id)
+          .eq('won', true);
+
+      for (final row in victories) {
+        switch (row['workout_type'] as String) {
+          case 'squats':
+            squatVictories++;
+            break;
+          case 'jumping_jacks':
+            jacksVictories++;
+            break;
+          case 'side_crunches':
+            crunchVictories++;
+            break;
+        }
+      }
+    } catch (e) {
+      assert(() {
+        debugPrint('[AchievementService] Failed to fetch victory counts: $e');
+        return true;
+      }());
+    }
 
     // --- Evaluate each achievement ---
     final newlyUnlocked = <AchievementId>[];
@@ -112,13 +166,16 @@ class AchievementService {
       }
     }
 
-    // --- Persist newly unlocked to Supabase ---
+    // --- Persist newly unlocked to user_achievements junction table ---
     if (newlyUnlocked.isNotEmpty) {
-      final now = DateTime.now().toUtc().toIso8601String();
-      final updates = <String, dynamic>{};
+      final inserts = <Map<String, dynamic>>[];
       for (final id in newlyUnlocked) {
-        updates[id.dbKey] = true;
-        updates['${id.dbKey}_unlocked_at'] = now;
+        final achievementId = _codeToId[id.dbKey];
+        if (achievementId == null) continue;
+        inserts.add({
+          'user_id': user.id,
+          'achievement_id': achievementId,
+        });
         assert(() {
           debugPrint('[AchievementService] UNLOCKED: ${id.displayName}');
           return true;
@@ -126,10 +183,7 @@ class AchievementService {
       }
 
       try {
-        await _client
-            .from('user_achievements')
-            .update(updates)
-            .eq('user_id', user.id);
+        await _client.from('user_achievements').insert(inserts);
       } catch (e) {
         assert(() {
           debugPrint('[AchievementService] Failed to persist achievements: $e');

@@ -4,8 +4,8 @@ import '../core/extensions.dart';
 import '../features/game/game_session.dart';
 
 /// Handles persisting completed game sessions to Supabase.
-/// Inserts a row into the sessions table; the DB trigger
-/// update_stats_on_session() then updates user_stats and leaderboards.
+/// Inserts a row into the sessions table. Stats and leaderboards
+/// are derived from database views (no triggers needed).
 class SessionService {
   static final _client = Supabase.instance.client;
 
