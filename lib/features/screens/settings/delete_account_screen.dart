@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../services/app_services.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/service_exception.dart';
 
 class DeleteAccountScreen extends StatefulWidget {
   const DeleteAccountScreen({super.key});
@@ -15,6 +17,16 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
   final _currentPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  late final AuthService _authService;
+  bool _servicesReady = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_servicesReady) return;
+    _authService = AppServicesScope.of(context).authService;
+    _servicesReady = true;
+  }
 
   @override
   void dispose() {
@@ -31,35 +43,13 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
 
     setState(() => _isLoading = true);
 
-    final supabase = Supabase.instance.client;
-    final email = supabase.auth.currentUser!.email!;
-    final userId = supabase.auth.currentUser!.id;
-
     try {
-      // Re-authenticate with current password
-      await supabase.auth.signInWithPassword(email: email, password: currentPw);
-
-      // Call delete-player edge function
-      final response = await supabase.functions.invoke(
-        'delete-player',
-        body: {'user_id': userId},
-      );
-
-      if (response.data != null && response.data['error'] != null) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          _showError(response.data['error']);
-        }
-        return;
-      }
-
-      // Sign out and navigate to auth landing
-      await supabase.auth.signOut();
+      await _authService.deleteAccount(currentPw);
 
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
       }
-    } on AuthException catch (e) {
+    } on AppServiceException catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         _showError(e.message);

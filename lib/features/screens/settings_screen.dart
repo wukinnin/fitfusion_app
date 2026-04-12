@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
+import '../../services/app_services.dart';
+import '../../services/auth_service.dart';
+import '../../services/user_settings_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,35 +14,27 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  static final _client = Supabase.instance.client;
-
   bool _showTutorial = true;
   double _volume = 0.8;
   bool _loading = true;
+  late final UserSettingsService _userSettingsService;
+  late final AuthService _authService;
+  bool _servicesReady = false;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_servicesReady) return;
+    final services = AppServicesScope.of(context);
+    _userSettingsService = services.userSettingsService;
+    _authService = services.authService;
+    _servicesReady = true;
     _loadSettings();
   }
 
   Future<void> _loadSettings() async {
-    final user = _client.auth.currentUser;
-    if (user == null) {
-      if (mounted) setState(() => _loading = false);
-      return;
-    }
-
     try {
-      final row = await _client
-          .from('users')
-          .select('show_tutorial')
-          .eq('id', user.id)
-          .maybeSingle();
-
-      if (row != null) {
-        _showTutorial = (row['show_tutorial'] as bool?) ?? true;
-      }
+      _showTutorial = await _userSettingsService.loadShowTutorial();
     } catch (e) {
       assert(() {
         debugPrint('[SettingsScreen] Failed to load settings: $e');
@@ -54,14 +48,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _updateShowTutorial(bool value) async {
     setState(() => _showTutorial = value);
 
-    final user = _client.auth.currentUser;
-    if (user == null) return;
-
     try {
-      await _client
-          .from('users')
-          .update({'show_tutorial': value})
-          .eq('id', user.id);
+      await _userSettingsService.updateShowTutorial(value);
     } catch (e) {
       assert(() {
         debugPrint('[SettingsScreen] Failed to update show_tutorial: $e');
@@ -71,7 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleLogOut() async {
-    await _client.auth.signOut();
+    await _authService.signOut();
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
     }

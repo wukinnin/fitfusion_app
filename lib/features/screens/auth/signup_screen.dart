@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../services/app_services.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/service_exception.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -21,6 +23,16 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
+  late final AuthService _authService;
+  bool _servicesReady = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_servicesReady) return;
+    _authService = AppServicesScope.of(context).authService;
+    _servicesReady = true;
+  }
 
   @override
   void dispose() {
@@ -77,65 +89,15 @@ class _SignupScreenState extends State<SignupScreen> {
 
     setState(() => _isLoading = true);
 
-    final supabase = Supabase.instance.client;
     final email = _emailController.text.trim();
     final username = _usernameController.text.trim();
     final password = _passwordController.text;
 
     try {
-      // Check email uniqueness
-      final emailExists = await supabase.rpc(
-        'check_email_exists',
-        params: {'p_email': email},
-      ) as bool;
-      if (emailExists) {
-        // Email exists — check if verified
-        // If not verified, redirect to verify screen
-        final rows = await supabase
-            .from('users')
-            .select('is_email_verified')
-            .eq('email', email)
-            .limit(1);
-        if (rows.isNotEmpty && rows[0]['is_email_verified'] == false) {
-          // Resend OTP and immediately redirect to verify
-          supabase.auth.resend(type: OtpType.signup, email: email);
-          if (mounted) {
-            setState(() => _isLoading = false);
-            _showError('Email not yet verified');
-            Navigator.pushNamed(
-              context,
-              '/auth/verify',
-              arguments: {'email': email, 'type': 'signup'},
-            );
-          }
-          return;
-        }
-        if (mounted) {
-          setState(() => _isLoading = false);
-          _showError('Email is already taken');
-        }
-        return;
-      }
-
-      // Check username uniqueness (case-insensitive) via RPC
-      final existingEmail = await supabase.rpc(
-        'get_email_by_username',
-        params: {'p_username': username},
-      );
-      if (existingEmail != null) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          _showError('Username is already taken');
-        }
-        return;
-      }
-
-      // Sign up with Supabase Auth — username passed via metadata
-      // Trigger handle_auth_user_created picks up username from raw_user_meta_data
-      await supabase.auth.signUp(
+      final result = await _authService.signUp(
+        username: username,
         email: email,
         password: password,
-        data: {'username': username},
       );
 
       if (mounted) {
@@ -143,10 +105,10 @@ class _SignupScreenState extends State<SignupScreen> {
         Navigator.pushNamed(
           context,
           '/auth/verify',
-          arguments: {'email': email, 'type': 'signup'},
+          arguments: {'email': result.email, 'type': result.type},
         );
       }
-    } on AuthException catch (e) {
+    } on AppServiceException catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         _showError(e.message);

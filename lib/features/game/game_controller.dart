@@ -16,7 +16,7 @@ class GameController {
   final FitFusionGame game;
   final RepDetector repDetector;
   final PaceMonitor paceMonitor;
-  final AchievementService achievementService;
+  final AchievementServiceBase achievementService;
 
   StreamSubscription<void>? _repSubscription;
   StreamSubscription<void>? _paceSubscription;

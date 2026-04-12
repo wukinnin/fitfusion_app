@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
+import '../../services/app_services.dart';
+import '../../services/leaderboard_service.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -14,7 +15,6 @@ class LeaderboardScreen extends StatefulWidget {
 class _LeaderboardScreenState extends State<LeaderboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  static final _client = Supabase.instance.client;
 
   // Per-workout metric index: 0 = Clear Time, 1 = Best Rep Interval
   final Map<int, int> _workoutMetricIndex = {0: 0, 1: 0, 2: 0};
@@ -24,20 +24,28 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   static const _workoutTabs = ['Squats', 'Jacks', 'Crunches', 'Lifetime'];
   static const _workoutMetrics = ['Clear Time', 'Best Rep Interval'];
   static const _lifetimeMetrics = ['Total Reps', 'Total Victories'];
-  static const _workoutDbKeys = ['squats', 'jumping_jacks', 'side_crunches'];
-
   bool _loading = true;
 
   // Cached leaderboard data: [tabIndex][metricIndex] → list of {rank, username, value}
   // Workout tabs: 3 tabs × 2 metrics each
   // Lifetime tab: 1 tab × 2 metrics
   final Map<String, List<Map<String, dynamic>>> _cache = {};
+  late final LeaderboardService _leaderboardService;
+  bool _servicesReady = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_servicesReady) return;
+    _leaderboardService = AppServicesScope.of(context).leaderboardService;
+    _servicesReady = true;
     _fetchAll();
   }
 
@@ -51,46 +59,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   Future<void> _fetchAll() async {
     try {
-      // Fetch workout leaderboards (clear time + best rep interval per workout type)
-      final clearTimeRows = await _client
-          .from('v_top10_clear_time')
-          .select();
-      final repIntervalRows = await _client
-          .from('v_top10_best_rep_interval')
-          .select();
-
-      for (int tab = 0; tab < 3; tab++) {
-        final dbKey = _workoutDbKeys[tab];
-
-        // Clear time (metric 0)
-        final ctEntries = (clearTimeRows as List)
-            .where((r) => r['workout_type'] == dbKey)
-            .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
-            .toList()
-          ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
-        _cache[_cacheKey(tab, 0)] = ctEntries;
-
-        // Best rep interval (metric 1)
-        final riEntries = (repIntervalRows as List)
-            .where((r) => r['workout_type'] == dbKey)
-            .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
-            .toList()
-          ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
-        _cache[_cacheKey(tab, 1)] = riEntries;
-      }
-
-      // Fetch lifetime leaderboards
-      final repsRows = await _client
-          .from('v_top10_lifetime_reps')
-          .select();
-      _cache[_cacheKey(3, 0)] = List<Map<String, dynamic>>.from(
-          (repsRows as List)..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int)));
-
-      final victoriesRows = await _client
-          .from('v_top10_lifetime_victories')
-          .select();
-      _cache[_cacheKey(3, 1)] = List<Map<String, dynamic>>.from(
-          (victoriesRows as List)..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int)));
+      _cache
+        ..clear()
+        ..addAll(await _leaderboardService.fetchLeaderboards());
     } catch (e) {
       assert(() {
         debugPrint('[LeaderboardScreen] Failed to fetch leaderboards: $e');

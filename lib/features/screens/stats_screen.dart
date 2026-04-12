@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/enums.dart';
-import '../../core/extensions.dart';
 import '../../core/theme.dart';
+import '../../services/app_services.dart';
+import '../../services/stats_service.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -16,14 +15,8 @@ class StatsScreen extends StatefulWidget {
 class _StatsScreenState extends State<StatsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  static final _client = Supabase.instance.client;
 
   static const _tabs = ['Squats', 'Jacks', 'Crunches', 'Overall'];
-  static const _workoutTypes = [
-    WorkoutType.squats,
-    WorkoutType.jumpingJacks,
-    WorkoutType.obliqueCrunches,
-  ];
 
   bool _loading = true;
 
@@ -31,11 +24,21 @@ class _StatsScreenState extends State<StatsScreen>
   final List<Map<String, String>> _workoutStats = List.generate(3, (_) => {});
   // Overall lifetime stats
   Map<String, String> _overallStats = {};
+  late final StatsService _statsService;
+  bool _servicesReady = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_servicesReady) return;
+    _statsService = AppServicesScope.of(context).statsService;
+    _servicesReady = true;
     _fetchStats();
   }
 
@@ -45,132 +48,13 @@ class _StatsScreenState extends State<StatsScreen>
     super.dispose();
   }
 
-  String _formatTime(double totalSeconds) {
-    final minutes = totalSeconds ~/ 60;
-    final secs = totalSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${secs.toStringAsFixed(2).padLeft(5, '0')}';
-  }
-
-  String _formatInterval(double seconds) {
-    return '${seconds.toStringAsFixed(3)}s';
-  }
-
   Future<void> _fetchStats() async {
-    final user = _client.auth.currentUser;
-    if (user == null) {
-      if (mounted) setState(() => _loading = false);
-      return;
-    }
-
     try {
-      // Fetch all user sessions
-      final sessions = await _client
-          .from('sessions')
-          .select()
-          .eq('user_id', user.id);
-
-      // Build per-workout stats
-      for (int i = 0; i < _workoutTypes.length; i++) {
-        final dbKey = _workoutTypes[i].dbKey;
-        final wSessions = (sessions as List)
-            .where((s) => s['workout_type'] == dbKey)
-            .toList();
-
-        if (wSessions.isEmpty) {
-          _workoutStats[i] = {
-            'fastestClearTime': '--',
-            'avgClearTime': '--',
-            'bestRepInterval': '--',
-            'avgRepInterval': '--',
-            'roundsCompleted': '0',
-            'repsFinished': '0',
-            'victories': '0',
-            'defeats': '0',
-          };
-          continue;
-        }
-
-        // Session stats (from winning sessions only for clear time)
-        final wonSessions = wSessions.where((s) => s['won'] == true).toList();
-
-        String fastestClearTime = '--';
-        String avgClearTime = '--';
-        if (wonSessions.isNotEmpty) {
-          final times = wonSessions
-              .map((s) => (s['total_time_seconds'] as num).toDouble())
-              .toList();
-          final minTime = times.reduce((a, b) => a < b ? a : b);
-          fastestClearTime = _formatTime(minTime);
-          if (wonSessions.length >= 2) {
-            final avgTime = times.reduce((a, b) => a + b) / times.length;
-            avgClearTime = _formatTime(avgTime);
-          }
-        }
-
-        // Best rep interval (across all sessions)
-        final intervals = wSessions
-            .where((s) => s['best_rep_interval_seconds'] != null)
-            .map((s) => (s['best_rep_interval_seconds'] as num).toDouble())
-            .toList();
-        String bestRepInterval = '--';
-        if (intervals.isNotEmpty) {
-          bestRepInterval = _formatInterval(
-              intervals.reduce((a, b) => a < b ? a : b));
-        }
-
-        // Avg rep interval (across all sessions)
-        final avgIntervals = wSessions
-            .where((s) => s['avg_rep_interval_seconds'] != null)
-            .map((s) => (s['avg_rep_interval_seconds'] as num).toDouble())
-            .toList();
-        String avgRepInterval = '--';
-        if (avgIntervals.length >= 2) {
-          avgRepInterval = _formatInterval(
-              avgIntervals.reduce((a, b) => a + b) / avgIntervals.length);
-        }
-
-        // Lifetime stats per workout
-        final totalRounds = wSessions.fold<int>(
-            0, (sum, s) => sum + ((s['rounds_completed'] as int?) ?? 0));
-        final totalReps = wSessions.fold<int>(
-            0, (sum, s) => sum + ((s['total_reps'] as int?) ?? 0));
-        final victories = wonSessions.length;
-        final defeats = wSessions.where((s) => s['won'] == false).length;
-
-        _workoutStats[i] = {
-          'fastestClearTime': fastestClearTime,
-          'avgClearTime': avgClearTime,
-          'bestRepInterval': bestRepInterval,
-          'avgRepInterval': avgRepInterval,
-          'roundsCompleted': totalRounds.toString(),
-          'repsFinished': totalReps.toString(),
-          'victories': victories.toString(),
-          'defeats': defeats.toString(),
-        };
+      final stats = await _statsService.fetchStats();
+      for (int i = 0; i < stats.workoutStats.length; i++) {
+        _workoutStats[i] = stats.workoutStats[i];
       }
-
-      // Overall lifetime stats from view
-      final lifetime = await _client
-          .from('v_user_lifetime_stats')
-          .select()
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-      if (lifetime != null) {
-        _overallStats = {
-          'totalSessions': (lifetime['total_sessions'] ?? 0).toString(),
-          'totalReps': (lifetime['total_reps'] ?? 0).toString(),
-          'totalRounds': (lifetime['total_rounds'] ?? 0).toString(),
-          'totalVictories': (lifetime['total_victories'] ?? 0).toString(),
-        };
-      } else {
-        _overallStats = {
-          'totalSessions': '0',
-          'totalReps': '0',
-          'totalRounds': '0',
-          'totalVictories': '0',
-        };
-      }
+      _overallStats = stats.overallStats;
     } catch (e) {
       assert(() {
         debugPrint('[StatsScreen] Failed to fetch stats: $e');

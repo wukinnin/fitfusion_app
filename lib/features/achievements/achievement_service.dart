@@ -19,7 +19,14 @@ import '../game/game_session.dart';
 /// On evaluateSession, queries lifetime stats from views + per-workout
 /// victories from sessions, evaluates all 11 achievement conditions,
 /// and inserts newly unlocked rows into user_achievements.
-class AchievementService {
+abstract class AchievementServiceBase {
+  Future<void> init();
+  bool isUnlocked(AchievementId id);
+  Set<AchievementId> get unlockedAchievements;
+  Future<List<AchievementId>> evaluateSession(GameSession session);
+}
+
+class AchievementService implements AchievementServiceBase {
   static final _client = Supabase.instance.client;
 
   /// Cached set of unlocked achievement codes (e.g. 'first_blood').
@@ -29,6 +36,7 @@ class AchievementService {
   /// Populated on first init so we can insert into user_achievements.
   final Map<String, int> _codeToId = {};
 
+  @override
   Future<void> init() async {
     final user = _client.auth.currentUser;
     if (user == null) return;
@@ -67,8 +75,10 @@ class AchievementService {
     }
   }
 
+  @override
   bool isUnlocked(AchievementId id) => _unlocked.contains(id.dbKey);
 
+  @override
   Set<AchievementId> get unlockedAchievements {
     final result = <AchievementId>{};
     for (final id in AchievementId.values) {
@@ -82,6 +92,7 @@ class AchievementService {
   /// per-workout victories from sessions table.
   /// Inserts newly unlocked rows into user_achievements junction table.
   /// Returns the list of NEWLY unlocked achievements (empty if none).
+  @override
   Future<List<AchievementId>> evaluateSession(GameSession session) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../services/app_services.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/service_exception.dart';
 
 class ChangeUsernameScreen extends StatefulWidget {
   const ChangeUsernameScreen({super.key});
@@ -17,6 +19,16 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
   final _confirmUsernameController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  late final AuthService _authService;
+  bool _servicesReady = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_servicesReady) return;
+    _authService = AppServicesScope.of(context).authService;
+    _servicesReady = true;
+  }
 
   @override
   void dispose() {
@@ -46,36 +58,10 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
 
     setState(() => _isLoading = true);
 
-    final supabase = Supabase.instance.client;
-    final email = supabase.auth.currentUser!.email!;
-    final userId = supabase.auth.currentUser!.id;
-
     try {
-      // Re-authenticate with current password
-      await supabase.auth.signInWithPassword(email: email, password: currentPw);
-
-      // Check username uniqueness (case-insensitive) via RPC
-      final existingEmail = await supabase.rpc(
-        'get_email_by_username',
-        params: {'p_username': newUsername},
-      );
-      if (existingEmail != null) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          _showError('Username is already taken');
-        }
-        return;
-      }
-
-      // Update username in public.users table
-      await supabase
-          .from('users')
-          .update({'username': newUsername})
-          .eq('id', userId);
-
-      // Update auth user metadata
-      await supabase.auth.updateUser(
-        UserAttributes(data: {'username': newUsername}),
+      await _authService.changeUsername(
+        currentPassword: currentPw,
+        newUsername: newUsername,
       );
 
       if (mounted) {
@@ -91,7 +77,7 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
         );
         Navigator.pop(context);
       }
-    } on AuthException catch (e) {
+    } on AppServiceException catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         _showError(e.message);

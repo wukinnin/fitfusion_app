@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/enums.dart';
 import '../../core/extensions.dart';
 import '../../core/theme.dart';
+import '../../services/app_services.dart';
 import '../achievements/achievement_service.dart';
 
 class AchievementsScreen extends StatefulWidget {
@@ -14,13 +15,17 @@ class AchievementsScreen extends StatefulWidget {
 }
 
 class _AchievementsScreenState extends State<AchievementsScreen> {
-  final AchievementService _service = AchievementService();
+  late final AchievementServiceBase _service;
   bool _loading = true;
   Set<AchievementId> _unlocked = {};
+  bool _servicesReady = false;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_servicesReady) return;
+    _service = AppServicesScope.of(context).achievementService;
+    _servicesReady = true;
     _loadAchievements();
   }
 

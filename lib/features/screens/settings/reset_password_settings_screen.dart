@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../services/app_services.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/service_exception.dart';
 
 class ResetPasswordSettingsScreen extends StatefulWidget {
   const ResetPasswordSettingsScreen({super.key});
@@ -21,6 +23,16 @@ class _ResetPasswordSettingsScreenState
   bool _obscureNew = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  late final AuthService _authService;
+  bool _servicesReady = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_servicesReady) return;
+    _authService = AppServicesScope.of(context).authService;
+    _servicesReady = true;
+  }
 
   @override
   void dispose() {
@@ -50,15 +62,11 @@ class _ResetPasswordSettingsScreenState
 
     setState(() => _isLoading = true);
 
-    final supabase = Supabase.instance.client;
-    final email = supabase.auth.currentUser!.email!;
-
     try {
-      // Re-authenticate with current password
-      await supabase.auth.signInWithPassword(email: email, password: currentPw);
-
-      // Update password
-      await supabase.auth.updateUser(UserAttributes(password: newPw));
+      await _authService.changePassword(
+        currentPassword: currentPw,
+        newPassword: newPw,
+      );
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -73,7 +81,7 @@ class _ResetPasswordSettingsScreenState
         );
         Navigator.pop(context);
       }
-    } on AuthException catch (e) {
+    } on AppServiceException catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         _showError(e.message);

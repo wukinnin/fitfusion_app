@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../services/app_services.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/service_exception.dart';
 
 class ChangeEmailScreen extends StatefulWidget {
   const ChangeEmailScreen({super.key});
@@ -17,6 +19,16 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
   final _confirmEmailController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  late final AuthService _authService;
+  bool _servicesReady = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_servicesReady) return;
+    _authService = AppServicesScope.of(context).authService;
+    _servicesReady = true;
+  }
 
   @override
   void dispose() {
@@ -49,30 +61,34 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
 
     setState(() => _isLoading = true);
 
-    final supabase = Supabase.instance.client;
-    final email = supabase.auth.currentUser!.email!;
-
     try {
-      // Re-authenticate with current password
-      await supabase.auth.signInWithPassword(email: email, password: currentPw);
-
-      // Update email — Supabase sends confirmation to both old and new email
-      await supabase.auth.updateUser(UserAttributes(email: newEmail));
+      final result = await _authService.changeEmail(
+        currentPassword: currentPw,
+        newEmail: newEmail,
+      );
 
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Confirmation sent to new email. Check your inbox.',
-              style: GoogleFonts.cinzel(color: AppTheme.bloodRed),
+        if (result.requiresVerification) {
+          Navigator.pushNamed(
+            context,
+            '/auth/verify',
+            arguments: {'email': result.email, 'type': result.type},
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Confirmation sent to new email. Check your inbox.',
+                style: GoogleFonts.cinzel(color: AppTheme.bloodRed),
+              ),
+              backgroundColor: AppTheme.gold,
             ),
-            backgroundColor: AppTheme.gold,
-          ),
-        );
-        Navigator.pop(context);
+          );
+          Navigator.pop(context);
+        }
       }
-    } on AuthException catch (e) {
+    } on AppServiceException catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         _showError(e.message);

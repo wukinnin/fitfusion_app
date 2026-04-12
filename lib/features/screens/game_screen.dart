@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/enums.dart';
 import '../../core/theme.dart';
+import '../../services/app_services.dart';
 import '../../services/session_service.dart';
 import '../../widgets/camera_preview_widget.dart';
 import '../../widgets/pose_overlay_painter.dart';
@@ -35,7 +36,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   // Game layer
   FitFusionGame? _game;
   GameController? _gameController;
-  final AchievementService _achievementService = AchievementService();
+  late AchievementServiceBase _achievementService;
+  late SessionService _sessionService;
 
   bool _isInit = false;
   bool _initialized = false;
@@ -56,6 +58,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInit) {
+      final services = AppServicesScope.of(context);
+      _achievementService = services.achievementService;
+      _sessionService = services.sessionService;
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args is WorkoutType) {
         _workoutType = args;
@@ -141,7 +146,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     bool saved = false;
     while (!saved) {
       try {
-        await SessionService.saveSession(session);
+        await _sessionService.saveSession(session);
         saved = true;
       } on SessionSaveException catch (e) {
         assert(() {

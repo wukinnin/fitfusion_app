@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../services/app_services.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/service_exception.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +20,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  late final AuthService _authService;
+  bool _servicesReady = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_servicesReady) return;
+    _authService = AppServicesScope.of(context).authService;
+    _servicesReady = true;
+  }
 
   @override
   void dispose() {
@@ -45,71 +57,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    final supabase = Supabase.instance.client;
     final identifier = _identifierController.text.trim();
     final password = _passwordController.text;
 
     try {
-      // Determine if identifier is email or username
-      String email;
-      if (identifier.contains('@')) {
-        email = identifier;
-      } else {
-        // Resolve username to email via RPC
-        final resolved = await supabase.rpc(
-          'get_email_by_username',
-          params: {'p_username': identifier},
-        );
-        if (resolved == null) {
-          if (mounted) {
-            setState(() => _isLoading = false);
-            _showError('Username not found');
-          }
-          return;
-        }
-        email = resolved as String;
-      }
-
-      // Sign in with Supabase Auth
-      await supabase.auth.signInWithPassword(
-        email: email,
+      final result = await _authService.login(
+        identifier: identifier,
         password: password,
       );
 
-      // Check if email is verified
-      final userId = supabase.auth.currentUser?.id;
-      if (userId != null) {
-        final rows = await supabase
-            .from('users')
-            .select('is_email_verified')
-            .eq('id', userId)
-            .limit(1);
-        if (rows.isNotEmpty && rows[0]['is_email_verified'] == false) {
-          // Not verified — sign out, resend OTP, immediately redirect
-          await supabase.auth.signOut();
-          supabase.auth.resend(type: OtpType.signup, email: email);
-          if (mounted) {
-            setState(() => _isLoading = false);
-            _showError('Email not yet verified');
-            Navigator.pushNamed(
-              context,
-              '/auth/verify',
-              arguments: {'email': email, 'type': 'signup'},
-            );
-          }
-          return;
-        }
-      }
-
       if (mounted) {
         setState(() => _isLoading = false);
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/home',
-          (route) => false,
-        );
+        if (result.destination == LoginDestination.verify) {
+          Navigator.pushNamed(
+            context,
+            '/auth/verify',
+            arguments: {'email': result.email ?? '', 'type': result.type ?? 'signup'},
+          );
+        } else {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/home',
+            (route) => false,
+          );
+        }
       }
-    } on AuthException catch (e) {
+    } on AppServiceException catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         _showError(e.message);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/theme.dart';
+import 'services/app_services.dart';
 import 'features/screens/achievements_screen.dart';
 import 'features/screens/auth/auth_landing_screen.dart';
 import 'features/screens/auth/forgot_password_screen.dart';
@@ -26,33 +27,36 @@ class FitFusionApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FitFusion',
-      theme: AppTheme.theme,
-      debugShowCheckedModeBanner: false,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const SplashScreen(),
-        '/auth': (context) => const AuthLandingScreen(),
-        '/auth/login': (context) => const LoginScreen(),
-        '/auth/signup': (context) => const SignupScreen(),
-        '/auth/verify': (context) => const VerifyEmailScreen(),
-        '/auth/forgot-password': (context) => const ForgotPasswordScreen(),
-        '/auth/reset-password': (context) => const ResetPasswordScreen(),
-        '/home': (context) => const HomeScreen(),
-        '/select': (context) => const WorkoutSelectScreen(),
-        '/game': (context) => const GameScreen(),
-        '/results': (context) => const ResultsScreen(),
-        '/leaderboard': (context) => const LeaderboardScreen(),
-        '/stats': (context) => const StatsScreen(),
-        '/achievements': (context) => const AchievementsScreen(),
-        '/settings': (context) => const SettingsScreen(),
-        '/settings/edit-profile': (context) => const EditProfileScreen(),
-        '/settings/reset-password': (context) => const ResetPasswordSettingsScreen(),
-        '/settings/change-username': (context) => const ChangeUsernameScreen(),
-        '/settings/change-email': (context) => const ChangeEmailScreen(),
-        '/settings/delete-account': (context) => const DeleteAccountScreen(),
-      },
+    return AppServicesScope(
+      services: AppServices.defaults(),
+      child: MaterialApp(
+        title: 'FitFusion',
+        theme: AppTheme.theme,
+        debugShowCheckedModeBanner: false,
+        initialRoute: '/',
+        routes: {
+          '/': (context) => const SplashScreen(),
+          '/auth': (context) => const AuthLandingScreen(),
+          '/auth/login': (context) => const LoginScreen(),
+          '/auth/signup': (context) => const SignupScreen(),
+          '/auth/verify': (context) => const VerifyEmailScreen(),
+          '/auth/forgot-password': (context) => const ForgotPasswordScreen(),
+          '/auth/reset-password': (context) => const ResetPasswordScreen(),
+          '/home': (context) => const HomeScreen(),
+          '/select': (context) => const WorkoutSelectScreen(),
+          '/game': (context) => const GameScreen(),
+          '/results': (context) => const ResultsScreen(),
+          '/leaderboard': (context) => const LeaderboardScreen(),
+          '/stats': (context) => const StatsScreen(),
+          '/achievements': (context) => const AchievementsScreen(),
+          '/settings': (context) => const SettingsScreen(),
+          '/settings/edit-profile': (context) => const EditProfileScreen(),
+          '/settings/reset-password': (context) => const ResetPasswordSettingsScreen(),
+          '/settings/change-username': (context) => const ChangeUsernameScreen(),
+          '/settings/change-email': (context) => const ChangeEmailScreen(),
+          '/settings/delete-account': (context) => const DeleteAccountScreen(),
+        },
+      ),
     );
   }
 }

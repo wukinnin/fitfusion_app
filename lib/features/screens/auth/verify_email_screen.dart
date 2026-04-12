@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../services/app_services.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/service_exception.dart';
 
 
 class VerifyEmailScreen extends StatefulWidget {
@@ -24,6 +26,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   int _resendCooldown = 0;
   Timer? _cooldownTimer;
+  late final AuthService _authService;
 
   void _startCooldown() {
     _resendCooldown = 30;
@@ -56,6 +59,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   void _parseArgs() {
     if (_argsParsed) return;
     _argsParsed = true;
+    _authService = AppServicesScope.of(context).authService;
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map<String, String>) {
       _email = args['email'] ?? '';
@@ -75,41 +79,22 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       _errorMessage = null;
     });
 
-    final supabase = Supabase.instance.client;
-
     try {
-      final otpType = _type == 'recovery' ? OtpType.recovery : OtpType.signup;
-
-      await supabase.auth.verifyOTP(
+      final result = await _authService.verifyEmail(
         email: _email,
-        token: code,
-        type: otpType,
+        code: code,
+        type: _type,
       );
-
-      if (_type == 'signup') {
-        // Mark email as verified in public.users
-        final userId = supabase.auth.currentUser?.id;
-        if (userId != null) {
-          await supabase
-              .from('users')
-              .update({'is_email_verified': true})
-              .eq('id', userId);
-        }
-        // Sign out so user logs in fresh
-        await supabase.auth.signOut();
-      }
 
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_type == 'recovery') {
-          // Recovery: proceed to reset password screen
+        if (result.destination == VerifyDestination.resetPassword) {
           Navigator.pushReplacementNamed(
             context,
             '/auth/reset-password',
-            arguments: _email,
+            arguments: result.email ?? _email,
           );
         } else {
-          // Signup: go to login
           Navigator.pushNamedAndRemoveUntil(
             context,
             '/auth/login',
@@ -117,7 +102,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           );
         }
       }
-    } on AuthException catch (e) {
+    } on AppServiceException catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -140,14 +125,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       _errorMessage = null;
     });
 
-    final supabase = Supabase.instance.client;
-
     try {
-      if (_type == 'recovery') {
-        await supabase.auth.resetPasswordForEmail(_email);
-      } else {
-        await supabase.auth.resend(type: OtpType.signup, email: _email);
-      }
+      await _authService.resendVerificationCode(email: _email, type: _type);
 
       if (mounted) {
         setState(() => _isResending = false);

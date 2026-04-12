@@ -2,16 +2,25 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/extensions.dart';
 import '../features/game/game_session.dart';
+import 'service_exception.dart';
 
 /// Handles persisting completed game sessions to Supabase.
 /// Inserts a row into the sessions table. Stats and leaderboards
 /// are derived from database views (no triggers needed).
-class SessionService {
-  static final _client = Supabase.instance.client;
+abstract class SessionService {
+  Future<void> saveSession(GameSession session);
+}
+
+class SupabaseSessionService implements SessionService {
+  SupabaseSessionService({SupabaseClient? client})
+      : _client = client ?? Supabase.instance.client;
+
+  final SupabaseClient _client;
 
   /// Inserts the completed [session] into the sessions table.
   /// Throws a [SessionSaveException] on failure.
-  static Future<void> saveSession(GameSession session) async {
+  @override
+  Future<void> saveSession(GameSession session) async {
     final user = _client.auth.currentUser;
     if (user == null) {
       throw SessionSaveException('No authenticated user — cannot save session.');
@@ -43,10 +52,6 @@ class SessionService {
 }
 
 /// Thrown when a session cannot be persisted to Supabase.
-class SessionSaveException implements Exception {
-  final String message;
-  const SessionSaveException(this.message);
-
-  @override
-  String toString() => 'SessionSaveException: $message';
+class SessionSaveException extends AppServiceException {
+  const SessionSaveException(super.message);
 }
