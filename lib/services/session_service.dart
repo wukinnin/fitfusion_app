@@ -17,6 +17,10 @@ class SessionService {
       throw SessionSaveException('No authenticated user — cannot save session.');
     }
 
+    // On defeat, timing stats are forfeit — save as NULL.
+    // Only lifetime-aggregatable fields (reps, rounds, lives_lost) are persisted.
+    final isVictory = session.won;
+
     final payload = {
       'user_id': user.id,
       'workout_type': session.workoutType.dbKey,
@@ -24,11 +28,13 @@ class SessionService {
       'rounds_completed': session.roundsCompleted,
       'total_reps': session.totalReps,
       'lives_lost': session.livesLost,
-      'total_time_seconds': session.totalTimeSeconds,
-      'best_rep_interval_seconds':
-          session.bestRepIntervalSeconds > 0 ? session.bestRepIntervalSeconds : null,
-      'avg_rep_interval_seconds':
-          session.avgRepIntervalSeconds > 0 ? session.avgRepIntervalSeconds : null,
+      'total_time_seconds': isVictory ? session.totalTimeSeconds : null,
+      'best_rep_interval_seconds': isVictory
+          ? (session.bestRepIntervalSeconds > 0 ? session.bestRepIntervalSeconds : null)
+          : null,
+      'avg_rep_interval_seconds': isVictory
+          ? (session.avgRepIntervalSeconds > 0 ? session.avgRepIntervalSeconds : null)
+          : null,
       'completed_at': session.completedAt.toUtc().toIso8601String(),
     };
 

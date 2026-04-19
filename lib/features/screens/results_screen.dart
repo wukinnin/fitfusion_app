@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../core/enums.dart';
 import '../../core/theme.dart';
-import '../../widgets/user_profile_footer.dart';
 import '../game/game_session.dart';
 
 class ResultsScreen extends StatefulWidget {
@@ -216,15 +215,15 @@ class _ResultsScreenState extends State<ResultsScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildStatRow('Clear Time:', _formatTime(session.totalTimeSeconds)),
+                            _buildStatRow('Clear Time:', _formatTime(session.totalTimeSeconds), forfeit: !isVictory),
                             const SizedBox(height: 8),
                             _buildStatRow('Rounds Complete:', '${session.roundsCompleted} / $kTotalRounds'),
                             const SizedBox(height: 8),
                             _buildStatRow('Reps Finished:', '${session.totalReps} / ${session.totalRepsRequired}'),
                             const SizedBox(height: 8),
-                            _buildStatRow('Best Rep Interval:', session.bestRepIntervalSeconds > 0 ? '${session.bestRepIntervalSeconds.toStringAsFixed(2)}s' : '--'),
+                            _buildStatRow('Best Rep Interval:', session.bestRepIntervalSeconds > 0 ? '${session.bestRepIntervalSeconds.toStringAsFixed(2)}s' : '--', forfeit: !isVictory),
                             const SizedBox(height: 8),
-                            _buildStatRow('Avg Rep Interval:', session.avgRepIntervalSeconds > 0 ? '${session.avgRepIntervalSeconds.toStringAsFixed(2)}s' : '--'),
+                            _buildStatRow('Avg Rep Interval:', session.avgRepIntervalSeconds > 0 ? '${session.avgRepIntervalSeconds.toStringAsFixed(2)}s' : '--', forfeit: !isVictory),
                           ],
                         ),
                       ),
@@ -307,35 +306,44 @@ class _ResultsScreenState extends State<ResultsScreen>
                 ),
               ),
             ),
-            const Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: UserProfileFooter(),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatRow(String label, String value) {
+  Widget _buildStatRow(String label, String value, {bool forfeit = false}) {
+    final labelColor = forfeit
+        ? AppTheme.creamWhite.withValues(alpha: 0.35)
+        : AppTheme.creamWhite;
+    final valueColor = forfeit
+        ? AppTheme.creamWhite.withValues(alpha: 0.35)
+        : AppTheme.creamWhite;
+    final decoration = forfeit ? TextDecoration.lineThrough : TextDecoration.none;
+    final decorationColor = forfeit
+        ? AppTheme.creamWhite.withValues(alpha: 0.5)
+        : null;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: AppTheme.creamWhite,
+          style: TextStyle(
+            color: labelColor,
             fontSize: 16,
             fontWeight: FontWeight.bold,
+            decoration: decoration,
+            decorationColor: decorationColor,
           ),
         ),
         Text(
           value,
-          style: const TextStyle(
-            color: AppTheme.creamWhite,
+          style: TextStyle(
+            color: valueColor,
             fontSize: 16,
+            decoration: decoration,
+            decorationColor: decorationColor,
           ),
         ),
       ],
