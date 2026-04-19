@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/enums.dart';
 import '../../core/extensions.dart';
 import '../../core/theme.dart';
+import '../../widgets/user_profile_footer.dart';
 import '../achievements/achievement_service.dart';
 
 class AchievementsScreen extends StatefulWidget {
@@ -54,9 +55,16 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
-          : _buildAchievementsList(),
+      body: Column(
+        children: [
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
+                : _buildAchievementsList(),
+          ),
+          const UserProfileFooter(),
+        ],
+      ),
     );
   }
 

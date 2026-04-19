@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../widgets/user_profile_footer.dart';
 
 class ChangeUsernameScreen extends StatefulWidget {
   const ChangeUsernameScreen({super.key});
@@ -133,12 +134,15 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 16),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 16),
             TextField(
               controller: _currentPasswordController,
               obscureText: _obscurePassword,
@@ -188,35 +192,39 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
                 fontSize: 12,
               ),
             ),
-            const SizedBox(height: 32),
-            SizedBox(
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _handleChangeUsername,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.gold,
-                  foregroundColor: AppTheme.bloodRed,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          color: AppTheme.bloodRed,
-                          strokeWidth: 2,
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleChangeUsername,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.gold,
+                        foregroundColor: AppTheme.bloodRed,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      )
-                    : const Text(
-                        'CHANGE USERNAME',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: AppTheme.bloodRed,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'CHANGE USERNAME',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          const UserProfileFooter(),
+        ],
       ),
     );
   }

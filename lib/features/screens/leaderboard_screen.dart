@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
+import '../../widgets/user_profile_footer.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -147,17 +148,24 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           tabs: _workoutTabs.map((t) => Tab(text: t)).toList(),
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildWorkoutTab(0),
-                _buildWorkoutTab(1),
-                _buildWorkoutTab(2),
-                _buildLifetimeTab(),
-              ],
-            ),
+      body: Column(
+        children: [
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildWorkoutTab(0),
+                      _buildWorkoutTab(1),
+                      _buildWorkoutTab(2),
+                      _buildLifetimeTab(),
+                    ],
+                  ),
+          ),
+          const UserProfileFooter(),
+        ],
+      ),
     );
   }
 

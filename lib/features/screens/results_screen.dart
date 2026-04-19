@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../core/enums.dart';
 import '../../core/theme.dart';
+import '../../widgets/user_profile_footer.dart';
 import '../game/game_session.dart';
 
 class ResultsScreen extends StatefulWidget {
@@ -305,6 +306,12 @@ class _ResultsScreenState extends State<ResultsScreen>
                   ),
                 ),
               ),
+            ),
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: UserProfileFooter(),
             ),
           ],
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme.dart';
+import '../../../widgets/user_profile_footer.dart';
 
 class EditProfileScreen extends StatelessWidget {
   const EditProfileScreen({super.key});
@@ -26,40 +27,46 @@ class EditProfileScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildTile(
-              context,
-              icon: Icons.lock_outline,
-              label: 'Reset Password',
-              route: '/settings/reset-password',
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildTile(
+                  context,
+                  icon: Icons.lock_outline,
+                  label: 'Reset Password',
+                  route: '/settings/reset-password',
+                ),
+                const SizedBox(height: 10),
+                _buildTile(
+                  context,
+                  icon: Icons.badge_outlined,
+                  label: 'Change Username',
+                  route: '/settings/change-username',
+                ),
+                const SizedBox(height: 10),
+                _buildTile(
+                  context,
+                  icon: Icons.email_outlined,
+                  label: 'Change Email',
+                  route: '/settings/change-email',
+                ),
+                const SizedBox(height: 10),
+                _buildTile(
+                  context,
+                  icon: Icons.delete_forever_outlined,
+                  label: 'Delete Account',
+                  route: '/settings/delete-account',
+                  color: AppTheme.crimson,
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            _buildTile(
-              context,
-              icon: Icons.badge_outlined,
-              label: 'Change Username',
-              route: '/settings/change-username',
-            ),
-            const SizedBox(height: 10),
-            _buildTile(
-              context,
-              icon: Icons.email_outlined,
-              label: 'Change Email',
-              route: '/settings/change-email',
-            ),
-            const SizedBox(height: 10),
-            _buildTile(
-              context,
-              icon: Icons.delete_forever_outlined,
-              label: 'Delete Account',
-              route: '/settings/delete-account',
-              color: AppTheme.crimson,
-            ),
-          ],
-        ),
+          ),
+          const Spacer(),
+          const UserProfileFooter(showEmail: true),
+        ],
       ),
     );
   }

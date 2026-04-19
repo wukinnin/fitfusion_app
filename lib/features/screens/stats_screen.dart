@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/enums.dart';
 import '../../core/extensions.dart';
 import '../../core/theme.dart';
+import '../../widgets/user_profile_footer.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -212,17 +213,24 @@ class _StatsScreenState extends State<StatsScreen>
           tabs: _tabs.map((t) => Tab(text: t)).toList(),
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildWorkoutStatsTab(0),
-                _buildWorkoutStatsTab(1),
-                _buildWorkoutStatsTab(2),
-                _buildOverallTab(),
-              ],
-            ),
+      body: Column(
+        children: [
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildWorkoutStatsTab(0),
+                      _buildWorkoutStatsTab(1),
+                      _buildWorkoutStatsTab(2),
+                      _buildOverallTab(),
+                    ],
+                  ),
+          ),
+          const UserProfileFooter(),
+        ],
+      ),
     );
   }
 

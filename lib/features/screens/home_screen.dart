@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../widgets/user_profile_footer.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -10,12 +11,15 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.bloodRed,
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
                 // Logo
                 Image.asset(
                   'assets/images/game/logo.png',
@@ -126,9 +130,13 @@ class HomeScreen extends StatelessWidget {
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
-          ),
+            ),
+            const UserProfileFooter(),
+          ],
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/enums.dart';
 import '../../core/theme.dart';
+import '../../widgets/user_profile_footer.dart';
 
 class WorkoutSelectScreen extends StatefulWidget {
   const WorkoutSelectScreen({super.key});
@@ -234,30 +235,37 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
         ),
         centerTitle: true,
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _WorkoutButton(
-                title: 'Squats',
-                onPressed: () => _onWorkoutSelected(context, WorkoutType.squats),
+      body: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _WorkoutButton(
+                      title: 'Squats',
+                      onPressed: () => _onWorkoutSelected(context, WorkoutType.squats),
+                    ),
+                    const SizedBox(height: 16),
+                    _WorkoutButton(
+                      title: 'Jumping Jacks',
+                      onPressed: () => _onWorkoutSelected(context, WorkoutType.jumpingJacks),
+                    ),
+                    const SizedBox(height: 16),
+                    _WorkoutButton(
+                      title: 'Side Crunches',
+                      onPressed: () => _onWorkoutSelected(context, WorkoutType.obliqueCrunches),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              _WorkoutButton(
-                title: 'Jumping Jacks',
-                onPressed: () => _onWorkoutSelected(context, WorkoutType.jumpingJacks),
-              ),
-              const SizedBox(height: 16),
-              _WorkoutButton(
-                title: 'Side Crunches',
-                onPressed: () => _onWorkoutSelected(context, WorkoutType.obliqueCrunches),
-              ),
-            ],
+            ),
           ),
-        ),
+          const UserProfileFooter(),
+        ],
       ),
     );
   }
