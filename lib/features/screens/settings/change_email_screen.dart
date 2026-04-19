@@ -127,10 +127,10 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
             TextField(
               controller: _currentPasswordController,
               obscureText: _obscurePassword,
-              style: const TextStyle(color: AppTheme.creamWhite),
+              style: GoogleFonts.crimsonText(color: AppTheme.creamWhite),
               decoration: InputDecoration(
                 labelText: 'Current Password',
-                labelStyle: TextStyle(
+                labelStyle: GoogleFonts.crimsonText(
                   color: AppTheme.creamWhite.withValues(alpha: 0.6),
                 ),
                 enabledBorder: OutlineInputBorder(
@@ -220,10 +220,10 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: const TextStyle(color: AppTheme.creamWhite),
+      style: GoogleFonts.crimsonText(color: AppTheme.creamWhite),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(
+        labelStyle: GoogleFonts.crimsonText(
           color: AppTheme.creamWhite.withValues(alpha: 0.6),
         ),
         enabledBorder: OutlineInputBorder(

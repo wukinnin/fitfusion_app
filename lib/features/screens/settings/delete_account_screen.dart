@@ -114,10 +114,10 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                   TextField(
                     controller: _currentPasswordController,
                     obscureText: _obscurePassword,
-                    style: const TextStyle(color: AppTheme.creamWhite),
+                    style: GoogleFonts.crimsonText(color: AppTheme.creamWhite),
                     decoration: InputDecoration(
                       labelText: 'Current Password',
-                      labelStyle: TextStyle(
+                      labelStyle: GoogleFonts.crimsonText(
                         color: AppTheme.creamWhite.withValues(alpha: 0.6),
                       ),
                       enabledBorder: OutlineInputBorder(

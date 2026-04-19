@@ -200,10 +200,10 @@ class _ResetPasswordSettingsScreenState
     return TextField(
       controller: controller,
       obscureText: obscure,
-      style: const TextStyle(color: AppTheme.creamWhite),
+      style: GoogleFonts.crimsonText(color: AppTheme.creamWhite),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(
+        labelStyle: GoogleFonts.crimsonText(
           color: AppTheme.creamWhite.withValues(alpha: 0.6),
         ),
         enabledBorder: OutlineInputBorder(
