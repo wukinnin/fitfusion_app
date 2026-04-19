@@ -22,8 +22,8 @@ import '../game/game_session.dart';
 class AchievementService {
   static final _client = Supabase.instance.client;
 
-  /// Cached set of unlocked achievement codes (e.g. 'first_blood').
-  final Set<String> _unlocked = {};
+  /// Cached map of unlocked achievement codes → unlock timestamps.
+  final Map<String, DateTime> _unlocked = {};
 
   /// Cached mapping of achievement code → achievement id (smallint PK).
   /// Populated on first init so we can insert into user_achievements.
@@ -45,13 +45,15 @@ class AchievementService {
       // Load this user's unlocked achievements via junction table
       final rows = await _client
           .from('user_achievements')
-          .select('achievement_id, achievements(code)')
+          .select('achievement_id, unlocked_at, achievements(code)')
           .eq('user_id', user.id);
 
       for (final row in rows) {
         final nested = row['achievements'];
         if (nested is Map && nested['code'] != null) {
-          _unlocked.add(nested['code'] as String);
+          final code = nested['code'] as String;
+          final ts = row['unlocked_at'] as String?;
+          _unlocked[code] = ts != null ? DateTime.parse(ts) : DateTime.now();
         }
       }
 
@@ -67,12 +69,22 @@ class AchievementService {
     }
   }
 
-  bool isUnlocked(AchievementId id) => _unlocked.contains(id.dbKey);
+  bool isUnlocked(AchievementId id) => _unlocked.containsKey(id.dbKey);
 
   Set<AchievementId> get unlockedAchievements {
     final result = <AchievementId>{};
     for (final id in AchievementId.values) {
-      if (_unlocked.contains(id.dbKey)) result.add(id);
+      if (_unlocked.containsKey(id.dbKey)) result.add(id);
+    }
+    return result;
+  }
+
+  /// Returns a map of unlocked AchievementId → unlock DateTime.
+  Map<AchievementId, DateTime> get unlockedDates {
+    final result = <AchievementId, DateTime>{};
+    for (final id in AchievementId.values) {
+      final ts = _unlocked[id.dbKey];
+      if (ts != null) result[id] = ts;
     }
     return result;
   }
@@ -147,7 +159,7 @@ class AchievementService {
     final newlyUnlocked = <AchievementId>[];
 
     for (final id in AchievementId.values) {
-      if (_unlocked.contains(id.dbKey)) continue;
+      if (_unlocked.containsKey(id.dbKey)) continue;
 
       final unlocked = _checkAchievement(
         id: id,
@@ -162,7 +174,7 @@ class AchievementService {
 
       if (unlocked) {
         newlyUnlocked.add(id);
-        _unlocked.add(id.dbKey);
+        _unlocked[id.dbKey] = DateTime.now();
       }
     }
 
@@ -230,7 +242,8 @@ class AchievementService {
                crunchVictories >= 1;
 
       case AchievementId.speedDemon:
-        return session.bestRepIntervalSeconds > 0 &&
+        return session.won &&
+               session.bestRepIntervalSeconds > 0 &&
                session.bestRepIntervalSeconds < kSpeedDemonThreshold;
 
       case AchievementId.blindingSteel:

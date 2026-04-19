@@ -17,7 +17,7 @@ class AchievementsScreen extends StatefulWidget {
 class _AchievementsScreenState extends State<AchievementsScreen> {
   final AchievementService _service = AchievementService();
   bool _loading = true;
-  Set<AchievementId> _unlocked = {};
+  Map<AchievementId, DateTime> _unlockedDates = {};
 
   @override
   void initState() {
@@ -29,7 +29,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     await _service.init();
     if (mounted) {
       setState(() {
-        _unlocked = _service.unlockedAchievements;
+        _unlockedDates = _service.unlockedDates;
         _loading = false;
       });
     }
@@ -79,12 +79,13 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
       separatorBuilder: (context, _) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final id = sorted[i];
-        final unlocked = _unlocked.contains(id);
+        final unlockedAt = _unlockedDates[id];
         return _AchievementTile(
           index: i + 1, // force 1-based numbering in UI (First Blood = #1)
           name: id.displayName,
           description: id.description,
-          unlocked: unlocked,
+          unlocked: unlockedAt != null,
+          unlockedAt: unlockedAt,
         );
       },
     );
@@ -96,12 +97,14 @@ class _AchievementTile extends StatelessWidget {
   final String name;
   final String description;
   final bool unlocked;
+  final DateTime? unlockedAt;
 
   const _AchievementTile({
     required this.index,
     required this.name,
     required this.description,
     required this.unlocked,
+    this.unlockedAt,
   });
 
   @override
@@ -166,6 +169,17 @@ class _AchievementTile extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
+                if (unlocked && unlockedAt != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Unlocked ${_formatDate(unlockedAt!)}',
+                    style: TextStyle(
+                      color: AppTheme.gold.withValues(alpha: 0.6),
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -175,5 +189,14 @@ class _AchievementTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static String _formatDate(DateTime dt) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final local = dt.toLocal();
+    return '${months[local.month - 1]} ${local.day}, ${local.year}';
   }
 }
