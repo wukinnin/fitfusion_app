@@ -57,21 +57,55 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
       // Re-authenticate with current password
       await supabase.auth.signInWithPassword(email: email, password: currentPw);
 
-      // Update email — Supabase sends confirmation to both old and new email
+      // Request email change — Supabase sends a 6-digit OTP to the new email
       await supabase.auth.updateUser(UserAttributes(email: newEmail));
 
-      if (mounted) {
-        setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      // Navigate to OTP verification screen; control returns here on success
+      final verified = await Navigator.pushNamed(
+        context,
+        '/auth/verify',
+        arguments: {
+          'email': newEmail,
+          'type': 'email_change',
+          'returnOnSuccess': true,
+        },
+      );
+
+      if (!mounted) return;
+      if (verified == true) {
+        _currentPasswordController.clear();
+        _newEmailController.clear();
+        _confirmEmailController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Confirmation sent to new email. Check your inbox.',
+              'Email updated successfully',
               style: GoogleFonts.cinzel(color: AppTheme.bloodRed),
             ),
             backgroundColor: AppTheme.gold,
           ),
         );
-        Navigator.pop(context);
+      } else {
+        // User cancelled or failed verification — roll back the pending
+        // email_change on auth.users so no stale state is left behind.
+        try {
+          await supabase.functions.invoke('cancel-email-change');
+        } catch (_) {
+          // Best-effort cleanup; ignore failures.
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Email change cancelled. No changes were made.',
+              style: GoogleFonts.cinzel(color: AppTheme.creamWhite),
+            ),
+            backgroundColor: AppTheme.crimson,
+          ),
+        );
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -169,7 +203,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Must be unique and not already taken. You will need to verify the new email.',
+              'Must be unique and not already taken. You\'ll receive a 6-digit code at the new email.',
               style: TextStyle(
                 color: AppTheme.creamWhite.withValues(alpha: 0.5),
                 fontSize: 12,

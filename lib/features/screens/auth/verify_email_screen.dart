@@ -50,16 +50,19 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   String _email = '';
-  String _type = 'signup'; // 'signup' or 'recovery'
+  String _type = 'signup'; // 'signup', 'recovery', or 'email_change'
+
+  bool _returnOnSuccess = false;
   bool _argsParsed = false;
 
   void _parseArgs() {
     if (_argsParsed) return;
     _argsParsed = true;
     final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is Map<String, String>) {
-      _email = args['email'] ?? '';
-      _type = args['type'] ?? 'signup';
+    if (args is Map) {
+      _email = args['email']?.toString() ?? '';
+      _type = args['type']?.toString() ?? 'signup';
+      _returnOnSuccess = args['returnOnSuccess'] == true;
     }
   }
 
@@ -78,7 +81,17 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     final supabase = Supabase.instance.client;
 
     try {
-      final otpType = _type == 'recovery' ? OtpType.recovery : OtpType.signup;
+      final OtpType otpType;
+      switch (_type) {
+        case 'recovery':
+          otpType = OtpType.recovery;
+          break;
+        case 'email_change':
+          otpType = OtpType.emailChange;
+          break;
+        default:
+          otpType = OtpType.signup;
+      }
 
       await supabase.auth.verifyOTP(
         email: _email,
@@ -97,10 +110,24 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         }
         // Sign out so user logs in fresh
         await supabase.auth.signOut();
+      } else if (_type == 'email_change') {
+        // Sync public.users.email with newly-verified auth.users.email
+        final userId = supabase.auth.currentUser?.id;
+        if (userId != null) {
+          await supabase
+              .from('users')
+              .update({'email': _email})
+              .eq('id', userId);
+        }
       }
 
       if (mounted) {
         setState(() => _isLoading = false);
+        if (_returnOnSuccess) {
+          // Caller wants control returned (e.g. Change Email flow)
+          Navigator.pop(context, true);
+          return;
+        }
         if (_type == 'recovery') {
           // Recovery: proceed to reset password screen
           Navigator.pushReplacementNamed(
@@ -145,6 +172,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     try {
       if (_type == 'recovery') {
         await supabase.auth.resetPasswordForEmail(_email);
+      } else if (_type == 'email_change') {
+        await supabase.auth.resend(type: OtpType.emailChange, email: _email);
       } else {
         await supabase.auth.resend(type: OtpType.signup, email: _email);
       }
