@@ -13,12 +13,12 @@ const int kFrameSkipCount = 2; // process every Nth frame from the camera
 const double kLandmarkLikelihoodThreshold = 0.5;
 
 // Rep Detection Thresholds
-// These are normalized coordinate values (0.0 to 1.0 relative to image size)
-// They will require tuning via physical device testing
+// Squat thresholds are ratios relative to the player's standing baseline
+// hip↔knee delta. 1.0 means fully upright; smaller values mean deeper squat.
 const double kSquatDownThreshold =
-    0.15; // Hip must drop below this delta to count as DOWN
+    0.65; // Half squat (parallel-ish) or deeper is valid
 const double kSquatUpThreshold =
-    0.28; // Hip must rise above this delta to count as UP (stand fully)
+    0.82; // Must rise back near standing to finish the rep
 const double kJumpingJackWristRaiseThreshold = 0.08;
 const double kJumpingJackPerLegThreshold =
     0.55; // Each leg must be > 0.55x shoulder width from center

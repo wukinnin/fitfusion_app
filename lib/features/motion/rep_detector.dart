@@ -53,6 +53,7 @@ class RepDetector {
   Stream<RepEvent> get repStream => _repController.stream;
 
   _SquatState _squatState = _SquatState.standing;
+  double? _squatStandingBaseline;
   final _LandmarkBuffer _squatBuffer = _LandmarkBuffer(
     kLandmarkBufferWindowSize,
   );
@@ -135,6 +136,7 @@ class RepDetector {
 
   void reset() {
     _squatState = _SquatState.standing;
+    _squatStandingBaseline = null;
     _jackState = _JumpingJackState.armsDown;
     _leftCrunchState = _CrunchSideState.extended;
     _rightCrunchState = _CrunchSideState.extended;
@@ -156,34 +158,70 @@ class RepDetector {
   void _processSquat(Pose pose) {
     // Use average of left and right sides for robustness
     // If one side is not visible, the other side still works
-    double? metric = _computeSquatMetric(pose);
+    final metric = _computeSquatMetric(pose);
     if (metric == null) return;
 
     _squatBuffer.add(metric);
     if (!_squatBuffer.isFull) return; // wait for buffer to fill before deciding
 
     final smoothed = _squatBuffer.average;
+    _refreshSquatStandingBaseline(smoothed);
+
+    final baseline = _squatStandingBaseline;
+    if (baseline == null || baseline <= 0) return;
+
+    final depthRatio = smoothed / baseline;
 
     switch (_squatState) {
       case _SquatState.standing:
-        // Hip drops toward knee — delta decreases
-        // Must drop significantly (deep squat) to trigger state change
-        if (smoothed < kSquatDownThreshold) {
+        // Hip drops toward knee — delta decreases relative to the standing baseline.
+        // Count once the player reaches at least a half squat (parallel-ish) or deeper.
+        if (depthRatio < kSquatDownThreshold) {
           _squatState = _SquatState.squatDown;
           debugPrint(
-            '[RepDetector] Squat DOWN detected (metric: ${smoothed.toStringAsFixed(3)})',
+            '[RepDetector] Squat DOWN detected '
+            '(ratio: ${depthRatio.toStringAsFixed(3)}, '
+            'metric: ${smoothed.toStringAsFixed(3)}, '
+            'baseline: ${baseline.toStringAsFixed(3)})',
           );
         }
         break;
 
       case _SquatState.squatDown:
-        // Hip rises back above knee — delta increases again
-        // Must rise significantly (full standing) to trigger rep
-        if (smoothed > kSquatUpThreshold) {
+        // Hip rises back up — require a clear return toward the standing baseline.
+        if (depthRatio > kSquatUpThreshold) {
           _squatState = _SquatState.standing;
+          debugPrint(
+            '[RepDetector] Squat UP detected '
+            '(ratio: ${depthRatio.toStringAsFixed(3)}, '
+            'metric: ${smoothed.toStringAsFixed(3)}, '
+            'baseline: ${baseline.toStringAsFixed(3)})',
+          );
           _emitRep();
         }
         break;
+    }
+  }
+
+  void _refreshSquatStandingBaseline(double smoothed) {
+    final baseline = _squatStandingBaseline;
+
+    if (baseline == null) {
+      _squatStandingBaseline = smoothed;
+      return;
+    }
+
+    // Only update the baseline while the player is effectively upright.
+    // This prevents the detector from "learning" a crouched pose as standing.
+    if (_squatState == _SquatState.standing) {
+      if (smoothed > baseline) {
+        _squatStandingBaseline = smoothed;
+        return;
+      }
+
+      if (smoothed > baseline * kSquatUpThreshold) {
+        _squatStandingBaseline = baseline * 0.9 + smoothed * 0.1;
+      }
     }
   }
 
@@ -191,7 +229,8 @@ class RepDetector {
     // hipKneeDelta = knee.y - hip.y
     // In image space, y increases downward.
     // Standing: hip is well above knee, so knee.y > hip.y, delta is POSITIVE and large.
-    // Squatting: hip descends toward knee level, delta gets SMALLER.
+    // Half squat / parallel: delta shrinks noticeably compared with standing.
+    // Full squat / deep: delta gets even smaller.
 
     final leftHip = pose.landmarks[PoseLandmarkType.leftHip];
     final leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
