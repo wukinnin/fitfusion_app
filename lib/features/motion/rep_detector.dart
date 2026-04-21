@@ -45,37 +45,58 @@ enum _CrunchSideState { extended, crunching }
 
 class RepDetector {
   final WorkoutType workoutType;
-  
+
   late final StreamSubscription<Pose?> _poseSubscription;
-  final StreamController<RepEvent> _repController = StreamController<RepEvent>.broadcast();
-  
+  final StreamController<RepEvent> _repController =
+      StreamController<RepEvent>.broadcast();
+
   Stream<RepEvent> get repStream => _repController.stream;
 
   _SquatState _squatState = _SquatState.standing;
-  final _LandmarkBuffer _squatBuffer = _LandmarkBuffer(kLandmarkBufferWindowSize);
+  final _LandmarkBuffer _squatBuffer = _LandmarkBuffer(
+    kLandmarkBufferWindowSize,
+  );
 
   _JumpingJackState _jackState = _JumpingJackState.armsDown;
-  final _LandmarkBuffer _jackLeftBuffer = _LandmarkBuffer(kLandmarkBufferWindowSize);
-  final _LandmarkBuffer _jackRightBuffer = _LandmarkBuffer(kLandmarkBufferWindowSize);
-  final _LandmarkBuffer _jackLegSpreadBuffer = _LandmarkBuffer(kLandmarkBufferWindowSize);
-  final _LandmarkBuffer _jackLegSymmetryBuffer = _LandmarkBuffer(kLandmarkBufferWindowSize);
+  final _LandmarkBuffer _jackLeftBuffer = _LandmarkBuffer(
+    kLandmarkBufferWindowSize,
+  );
+  final _LandmarkBuffer _jackRightBuffer = _LandmarkBuffer(
+    kLandmarkBufferWindowSize,
+  );
+  final _LandmarkBuffer _jackLegSpreadBuffer = _LandmarkBuffer(
+    kLandmarkBufferWindowSize,
+  );
+  final _LandmarkBuffer _jackLegSymmetryBuffer = _LandmarkBuffer(
+    kLandmarkBufferWindowSize,
+  );
 
   // Per-side independent state — left and right are never mutually exclusive
   _CrunchSideState _leftCrunchState = _CrunchSideState.extended;
   _CrunchSideState _rightCrunchState = _CrunchSideState.extended;
-  
+
   // Robustness: Cache the shoulder width so momentary occlusion doesn't break detection
   double? _lastValidShoulderWidth;
 
   // Primary rep metric: elbow-to-knee distance, normalised by shoulder width.
   // Small value = elbow and raised knee are close together (crunched).
-  final _LandmarkBuffer _crunchLeftElbowKneeBuffer = _LandmarkBuffer(kLandmarkBufferWindowSize);
-  final _LandmarkBuffer _crunchRightElbowKneeBuffer = _LandmarkBuffer(kLandmarkBufferWindowSize);
+  final _LandmarkBuffer _crunchLeftElbowKneeBuffer = _LandmarkBuffer(
+    kLandmarkBufferWindowSize,
+  );
+  final _LandmarkBuffer _crunchRightElbowKneeBuffer = _LandmarkBuffer(
+    kLandmarkBufferWindowSize,
+  );
 
-  RepDetector({
-    required this.workoutType,
-    required Stream<Pose?> poseStream,
-  }) {
+  // Form validator: both elbows must stay anchored near the head/ears.
+  // This is a practical pose-estimation proxy for "both hands on head".
+  final _LandmarkBuffer _crunchLeftElbowEarBuffer = _LandmarkBuffer(
+    kLandmarkBufferWindowSize,
+  );
+  final _LandmarkBuffer _crunchRightElbowEarBuffer = _LandmarkBuffer(
+    kLandmarkBufferWindowSize,
+  );
+
+  RepDetector({required this.workoutType, required Stream<Pose?> poseStream}) {
     _initializeStateForWorkout();
     _poseSubscription = poseStream.listen(_onPose);
   }
@@ -86,7 +107,7 @@ class RepDetector {
 
   void _onPose(Pose? pose) {
     if (pose == null) return;
-    
+
     switch (workoutType) {
       case WorkoutType.squats:
         _processSquat(pose);
@@ -107,10 +128,9 @@ class RepDetector {
 
   void _emitRep() {
     debugPrint('[RepDetector] REP DETECTED — $workoutType');
-    _repController.add(RepEvent(
-      workoutType: workoutType,
-      timestamp: DateTime.now(),
-    ));
+    _repController.add(
+      RepEvent(workoutType: workoutType, timestamp: DateTime.now()),
+    );
   }
 
   void reset() {
@@ -125,6 +145,8 @@ class RepDetector {
     _jackLegSymmetryBuffer.clear();
     _crunchLeftElbowKneeBuffer.clear();
     _crunchRightElbowKneeBuffer.clear();
+    _crunchLeftElbowEarBuffer.clear();
+    _crunchRightElbowEarBuffer.clear();
     _lastValidShoulderWidth = null;
     debugPrint('[RepDetector] State reset');
   }
@@ -148,7 +170,9 @@ class RepDetector {
         // Must drop significantly (deep squat) to trigger state change
         if (smoothed < kSquatDownThreshold) {
           _squatState = _SquatState.squatDown;
-          debugPrint('[RepDetector] Squat DOWN detected (metric: ${smoothed.toStringAsFixed(3)})');
+          debugPrint(
+            '[RepDetector] Squat DOWN detected (metric: ${smoothed.toStringAsFixed(3)})',
+          );
         }
         break;
 
@@ -168,7 +192,7 @@ class RepDetector {
     // In image space, y increases downward.
     // Standing: hip is well above knee, so knee.y > hip.y, delta is POSITIVE and large.
     // Squatting: hip descends toward knee level, delta gets SMALLER.
-    
+
     final leftHip = pose.landmarks[PoseLandmarkType.leftHip];
     final leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
     final rightHip = pose.landmarks[PoseLandmarkType.rightHip];
@@ -178,13 +202,15 @@ class RepDetector {
     double? leftDelta;
     double? rightDelta;
 
-    if (leftHip != null && leftKnee != null &&
+    if (leftHip != null &&
+        leftKnee != null &&
         leftHip.likelihood >= kLandmarkLikelihoodThreshold &&
         leftKnee.likelihood >= kLandmarkLikelihoodThreshold) {
       leftDelta = leftKnee.y - leftHip.y;
     }
 
-    if (rightHip != null && rightKnee != null &&
+    if (rightHip != null &&
+        rightKnee != null &&
         rightHip.likelihood >= kLandmarkLikelihoodThreshold &&
         rightKnee.likelihood >= kLandmarkLikelihoodThreshold) {
       rightDelta = rightKnee.y - rightHip.y;
@@ -200,10 +226,16 @@ class RepDetector {
 
   void _processJumpingJack(Pose pose) {
     final leftMetric = _computeJackMetric(
-      pose, PoseLandmarkType.leftWrist, PoseLandmarkType.leftShoulder);
+      pose,
+      PoseLandmarkType.leftWrist,
+      PoseLandmarkType.leftShoulder,
+    );
     final rightMetric = _computeJackMetric(
-      pose, PoseLandmarkType.rightWrist, PoseLandmarkType.rightShoulder);
-    
+      pose,
+      PoseLandmarkType.rightWrist,
+      PoseLandmarkType.rightShoulder,
+    );
+
     // Returns [spreadRatio, symmetryRatio]
     final legMetrics = _computeJackLegMetrics(pose);
 
@@ -228,7 +260,9 @@ class RepDetector {
 
     // Debug print
     if (leftSmoothed > 0.05 || rightSmoothed > 0.05) {
-       debugPrint('[JJ Debug] L:${leftSmoothed.toStringAsFixed(3)} R:${rightSmoothed.toStringAsFixed(3)} Spread:${spreadSmoothed.toStringAsFixed(2)} Sym:${symmetrySmoothed.toStringAsFixed(2)} State:$_jackState');
+      debugPrint(
+        '[JJ Debug] L:${leftSmoothed.toStringAsFixed(3)} R:${rightSmoothed.toStringAsFixed(3)} Spread:${spreadSmoothed.toStringAsFixed(2)} Sym:${symmetrySmoothed.toStringAsFixed(2)} State:$_jackState',
+      );
     }
 
     switch (_jackState) {
@@ -248,7 +282,7 @@ class RepDetector {
       case _JumpingJackState.armsUp:
         // Arms return down: wrist drops back below shoulder
         // AND Legs must be together (total spread small)
-        if (leftSmoothed <= 0 && 
+        if (leftSmoothed <= 0 &&
             rightSmoothed <= 0 &&
             spreadSmoothed < kJumpingJackLegsTogetherRatio) {
           _jackState = _JumpingJackState.armsDown;
@@ -266,12 +300,15 @@ class RepDetector {
     final leftAnkle = pose.landmarks[PoseLandmarkType.leftAnkle];
     final rightAnkle = pose.landmarks[PoseLandmarkType.rightAnkle];
 
-    if (leftShoulder == null || rightShoulder == null ||
-        leftHip == null || rightHip == null ||
-        leftAnkle == null || rightAnkle == null) {
+    if (leftShoulder == null ||
+        rightShoulder == null ||
+        leftHip == null ||
+        rightHip == null ||
+        leftAnkle == null ||
+        rightAnkle == null) {
       return null;
     }
-        
+
     // Check likelihoods
     if (leftShoulder.likelihood < kLandmarkLikelihoodThreshold ||
         rightShoulder.likelihood < kLandmarkLikelihoodThreshold ||
@@ -284,15 +321,15 @@ class RepDetector {
 
     final shoulderWidth = math.sqrt(
       math.pow(leftShoulder.x - rightShoulder.x, 2) +
-      math.pow(leftShoulder.y - rightShoulder.y, 2)
+          math.pow(leftShoulder.y - rightShoulder.y, 2),
     );
-    
+
     if (shoulderWidth == 0) return null;
 
     // Metric 1: Total Spread (Ankle to Ankle)
     final ankleDistance = math.sqrt(
       math.pow(leftAnkle.x - rightAnkle.x, 2) +
-      math.pow(leftAnkle.y - rightAnkle.y, 2)
+          math.pow(leftAnkle.y - rightAnkle.y, 2),
     );
     final spreadRatio = ankleDistance / shoulderWidth;
 
@@ -300,14 +337,18 @@ class RepDetector {
     final midHipX = (leftHip.x + rightHip.x) / 2;
     final leftDist = (leftAnkle.x - midHipX).abs();
     final rightDist = (rightAnkle.x - midHipX).abs();
-    
+
     // We care about the *minimum* extension. If one leg is 0.0 and the other is 1.0, min is 0.0 -> Fail.
     final symmetryRatio = math.min(leftDist, rightDist) / shoulderWidth;
 
     return [spreadRatio, symmetryRatio];
   }
 
-  double? _computeJackMetric(Pose pose, PoseLandmarkType wristType, PoseLandmarkType shoulderType) {
+  double? _computeJackMetric(
+    Pose pose,
+    PoseLandmarkType wristType,
+    PoseLandmarkType shoulderType,
+  ) {
     final wrist = pose.landmarks[wristType];
     final shoulder = pose.landmarks[shoulderType];
 
@@ -333,10 +374,11 @@ class RepDetector {
   //   1. PRIMARY METRIC  — elbow↔knee distance (normalised by shoulder width).
   //      Standing/extended: large ratio (elbow is far above the lowered knee).
   //      Crunched:          small ratio (elbow and raised knee converge).
-  //   2. FORM VALIDATOR  — ear↔elbow distance (normalised by shoulder width).
-  //      Hands-behind-head: small ratio throughout the entire movement.
-  //      Frames where this is too large are skipped to avoid false counts
-  //      when the user drops their arms between sets.
+  //   2. FORM VALIDATOR  — ear↔elbow distance on BOTH sides.
+  //      This acts as a head-anchor proxy so reps only count while the player
+  //      keeps both hands/elbows in a hands-on-head posture.
+  //      If either elbow leaves the head position, the crunch state machine is
+  //      re-armed and no rep can complete until proper form is restored.
   //
   // Left and right sides run as fully independent state machines so that
   // alternating reps (L, R, L, R …) are each counted without one side
@@ -345,7 +387,7 @@ class RepDetector {
   void _processObliqueCrunch(Pose pose) {
     // Compute a normalisation reference that is robust to camera distance.
     final currentWidth = _computeShoulderWidth(pose);
-    
+
     if (currentWidth != null && currentWidth > 0) {
       _lastValidShoulderWidth = currentWidth;
     }
@@ -353,11 +395,62 @@ class RepDetector {
     final refWidth = _lastValidShoulderWidth;
     if (refWidth == null) return; // No reference yet, cannot normalize
 
-    // --- Gather per-side raw metrics ---
-    final leftElbowKnee  = _computeNormalisedDistance(
-      pose, PoseLandmarkType.leftElbow, PoseLandmarkType.leftKnee, refWidth);
+    // --- Enforce "both hands on head" before accepting any crunch motion ---
+    final leftElbowEar = _computeNormalisedDistance(
+      pose,
+      PoseLandmarkType.leftElbow,
+      PoseLandmarkType.leftEar,
+      refWidth,
+    );
+    final rightElbowEar = _computeNormalisedDistance(
+      pose,
+      PoseLandmarkType.rightElbow,
+      PoseLandmarkType.rightEar,
+      refWidth,
+    );
+
+    if (leftElbowEar == null || rightElbowEar == null) {
+      _invalidateObliqueCrunchTracking();
+      return;
+    }
+
+    _crunchLeftElbowEarBuffer.add(leftElbowEar);
+    _crunchRightElbowEarBuffer.add(rightElbowEar);
+
+    if (!_crunchLeftElbowEarBuffer.isFull ||
+        !_crunchRightElbowEarBuffer.isFull) {
+      return;
+    }
+
+    final leftElbowEarSmoothed = _crunchLeftElbowEarBuffer.average;
+    final rightElbowEarSmoothed = _crunchRightElbowEarBuffer.average;
+    final hasHandsOnHeadForm =
+        leftElbowEarSmoothed <= kCrunchElbowEarOnHeadThreshold &&
+        rightElbowEarSmoothed <= kCrunchElbowEarOnHeadThreshold;
+
+    if (!hasHandsOnHeadForm) {
+      debugPrint(
+        '[Crunch Form] Invalid hands-on-head form '
+        '(leftElbowEar: ${leftElbowEarSmoothed.toStringAsFixed(3)}, '
+        'rightElbowEar: ${rightElbowEarSmoothed.toStringAsFixed(3)})',
+      );
+      _invalidateObliqueCrunchTracking();
+      return;
+    }
+
+    // --- Gather per-side raw rep metrics ---
+    final leftElbowKnee = _computeNormalisedDistance(
+      pose,
+      PoseLandmarkType.leftElbow,
+      PoseLandmarkType.leftKnee,
+      refWidth,
+    );
     final rightElbowKnee = _computeNormalisedDistance(
-      pose, PoseLandmarkType.rightElbow, PoseLandmarkType.rightKnee, refWidth);
+      pose,
+      PoseLandmarkType.rightElbow,
+      PoseLandmarkType.rightKnee,
+      refWidth,
+    );
 
     // Only add to a buffer when its landmarks are visible this frame.
     // Buffers are updated atomically per side so they stay in sync.
@@ -388,6 +481,15 @@ class RepDetector {
     }
   }
 
+  void _invalidateObliqueCrunchTracking() {
+    // If form breaks, the player must re-establish a clean starting posture
+    // before another rep can begin or complete.
+    _crunchLeftElbowKneeBuffer.clear();
+    _crunchRightElbowKneeBuffer.clear();
+    _leftCrunchState = _CrunchSideState.extended;
+    _rightCrunchState = _CrunchSideState.extended;
+  }
+
   void _evaluateCrunchSide({
     required String side,
     required double elbowKneeSmoothed,
@@ -401,8 +503,10 @@ class RepDetector {
         // Elbow and knee converge — crunch phase begins.
         if (elbowKneeSmoothed < kCrunchElbowKneeCrunchThreshold) {
           stateSetter(_CrunchSideState.crunching);
-          debugPrint('[Crunch $side] CRUNCHING '
-              '(elbowKnee: ${elbowKneeSmoothed.toStringAsFixed(3)})');
+          debugPrint(
+            '[Crunch $side] CRUNCHING '
+            '(elbowKnee: ${elbowKneeSmoothed.toStringAsFixed(3)})',
+          );
         }
         break;
 
@@ -413,8 +517,10 @@ class RepDetector {
         if (elbowKneeSmoothed > kCrunchElbowKneeExtendedThreshold) {
           stateSetter(_CrunchSideState.extended);
           _emitRep();
-          debugPrint('[Crunch $side] REP COMPLETE '
-              '(elbowKnee: ${elbowKneeSmoothed.toStringAsFixed(3)})');
+          debugPrint(
+            '[Crunch $side] REP COMPLETE '
+            '(elbowKnee: ${elbowKneeSmoothed.toStringAsFixed(3)})',
+          );
         }
         break;
     }
