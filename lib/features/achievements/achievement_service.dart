@@ -28,40 +28,33 @@ class AchievementService {
   /// Cached mapping of achievement code → achievement id (smallint PK).
   /// Populated on first init so we can insert into user_achievements.
   final Map<String, int> _codeToId = {};
+  final Map<int, String> _idToCode = {};
+  bool _isInitialized = false;
 
   Future<void> init() async {
     final user = _client.auth.currentUser;
-    if (user == null) return;
+    _isInitialized = false;
+    _unlocked.clear();
+
+    if (user == null) {
+      _codeToId.clear();
+      _idToCode.clear();
+      return;
+    }
 
     try {
-      // Load all achievement master rows (only 11 rows, safe to fetch all)
-      final allAchievements = await _client
-          .from('achievements')
-          .select('id, code');
-      for (final row in allAchievements) {
-        _codeToId[row['code'] as String] = row['id'] as int;
-      }
-
-      // Load this user's unlocked achievements via junction table
-      final rows = await _client
-          .from('user_achievements')
-          .select('achievement_id, unlocked_at, achievements(code)')
-          .eq('user_id', user.id);
-
-      for (final row in rows) {
-        final nested = row['achievements'];
-        if (nested is Map && nested['code'] != null) {
-          final code = nested['code'] as String;
-          final ts = row['unlocked_at'] as String?;
-          _unlocked[code] = ts != null ? DateTime.parse(ts) : DateTime.now();
-        }
-      }
+      await _loadAchievementMaster();
+      await _reloadUnlockedAchievements(user.id);
+      _isInitialized = _codeToId.isNotEmpty;
 
       assert(() {
-        debugPrint('[AchievementService] Loaded ${_unlocked.length} unlocked achievements');
+        debugPrint(
+          '[AchievementService] Loaded ${_unlocked.length} unlocked achievements',
+        );
         return true;
       }());
     } catch (e) {
+      _isInitialized = false;
       assert(() {
         debugPrint('[AchievementService] init error: $e');
         return true;
@@ -97,6 +90,32 @@ class AchievementService {
   Future<List<AchievementId>> evaluateSession(GameSession session) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
+
+    // Fail closed: if achievement metadata or existing unlock state cannot be
+    // loaded authoritatively, do not show achievement popups.
+    await init();
+    if (!_isInitialized) {
+      assert(() {
+        debugPrint(
+          '[AchievementService] Skipping evaluation because initialization failed.',
+        );
+        return true;
+      }());
+      return [];
+    }
+
+    late final Set<String> unlockedBeforeSession;
+    try {
+      unlockedBeforeSession = await _reloadUnlockedAchievements(user.id);
+    } catch (e) {
+      assert(() {
+        debugPrint(
+          '[AchievementService] Failed to refresh existing achievements before evaluation: $e',
+        );
+        return true;
+      }());
+      return [];
+    }
 
     // --- Fetch lifetime stats from view ---
     int lifetimeSessions = 0;
@@ -156,10 +175,10 @@ class AchievementService {
     }
 
     // --- Evaluate each achievement ---
-    final newlyUnlocked = <AchievementId>[];
+    final candidates = <AchievementId>[];
 
     for (final id in AchievementId.values) {
-      if (_unlocked.containsKey(id.dbKey)) continue;
+      if (unlockedBeforeSession.contains(id.dbKey)) continue;
 
       final unlocked = _checkAchievement(
         id: id,
@@ -173,38 +192,102 @@ class AchievementService {
       );
 
       if (unlocked) {
-        newlyUnlocked.add(id);
-        _unlocked[id.dbKey] = DateTime.now();
+        candidates.add(id);
       }
     }
 
-    // --- Persist newly unlocked to user_achievements junction table ---
-    if (newlyUnlocked.isNotEmpty) {
-      final inserts = <Map<String, dynamic>>[];
-      for (final id in newlyUnlocked) {
-        final achievementId = _codeToId[id.dbKey];
-        if (achievementId == null) continue;
-        inserts.add({
+    if (candidates.isEmpty) return [];
+
+    // --- Persist only confirmed unlocks; popups should reflect successful DB writes ---
+    final newlyUnlocked = <AchievementId>[];
+    for (final id in candidates) {
+      final achievementId = _codeToId[id.dbKey];
+      if (achievementId == null) {
+        assert(() {
+          debugPrint(
+            '[AchievementService] Missing achievement id for ${id.dbKey}; skipping popup.',
+          );
+          return true;
+        }());
+        continue;
+      }
+
+      try {
+        await _client.from('user_achievements').insert({
           'user_id': user.id,
           'achievement_id': achievementId,
         });
+
+        final unlockedAt = DateTime.now();
+        _unlocked[id.dbKey] = unlockedAt;
+        newlyUnlocked.add(id);
+
         assert(() {
           debugPrint('[AchievementService] UNLOCKED: ${id.displayName}');
           return true;
         }());
-      }
-
-      try {
-        await _client.from('user_achievements').insert(inserts);
+      } on PostgrestException catch (e) {
+        assert(() {
+          debugPrint(
+            '[AchievementService] Failed to persist ${id.displayName}: ${e.message}',
+          );
+          return true;
+        }());
       } catch (e) {
         assert(() {
-          debugPrint('[AchievementService] Failed to persist achievements: $e');
+          debugPrint(
+            '[AchievementService] Unexpected persist failure for ${id.displayName}: $e',
+          );
           return true;
         }());
       }
     }
 
+    // Refresh local cache from the DB so later screens reflect the source of truth.
+    try {
+      await _reloadUnlockedAchievements(user.id);
+    } catch (_) {}
+
     return newlyUnlocked;
+  }
+
+  Future<void> _loadAchievementMaster() async {
+    _codeToId.clear();
+    _idToCode.clear();
+
+    final allAchievements = await _client
+        .from('achievements')
+        .select('id, code');
+    for (final row in allAchievements) {
+      final id = (row['id'] as num).toInt();
+      final code = row['code'] as String;
+      _codeToId[code] = id;
+      _idToCode[id] = code;
+    }
+  }
+
+  Future<Set<String>> _reloadUnlockedAchievements(String userId) async {
+    _unlocked.clear();
+
+    final rows = await _client
+        .from('user_achievements')
+        .select('achievement_id, unlocked_at')
+        .eq('user_id', userId);
+
+    final unlockedCodes = <String>{};
+    for (final row in rows) {
+      final achievementId = row['achievement_id'];
+      if (achievementId == null) continue;
+
+      final code = _idToCode[(achievementId as num).toInt()];
+      if (code == null) continue;
+
+      final ts = row['unlocked_at'] as String?;
+      _unlocked[code] = ts != null ? DateTime.parse(ts) : DateTime.now();
+      unlockedCodes.add(code);
+    }
+
+    return unlockedCodes;
   }
 
   bool _checkAchievement({
@@ -238,18 +321,18 @@ class AchievementService {
 
       case AchievementId.tripleCrown:
         return squatVictories >= 1 &&
-               jacksVictories >= 1 &&
-               crunchVictories >= 1;
+            jacksVictories >= 1 &&
+            crunchVictories >= 1;
 
       case AchievementId.speedDemon:
         return session.won &&
-               session.bestRepIntervalSeconds > 0 &&
-               session.bestRepIntervalSeconds < kSpeedDemonThreshold;
+            session.bestRepIntervalSeconds > 0 &&
+            session.bestRepIntervalSeconds < kSpeedDemonThreshold;
 
       case AchievementId.blindingSteel:
         return session.won &&
-               session.avgRepIntervalSeconds > 0 &&
-               session.avgRepIntervalSeconds < kBlindingSteelThreshold;
+            session.avgRepIntervalSeconds > 0 &&
+            session.avgRepIntervalSeconds < kBlindingSteelThreshold;
 
       case AchievementId.untouchable:
         return session.won && session.livesLost == 0;
