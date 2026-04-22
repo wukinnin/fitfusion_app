@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/enums.dart';
 import '../../core/theme.dart';
+import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
 
 class WorkoutSelectScreen extends StatefulWidget {
@@ -73,10 +74,12 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
                         children: _tutorialSteps
                             .asMap()
                             .entries
-                            .map((entry) => _buildTutorialStep(
-                                  entry.key + 1,
-                                  entry.value,
-                                ))
+                            .map(
+                              (entry) => _buildTutorialStep(
+                                entry.key + 1,
+                                entry.value,
+                              ),
+                            )
                             .toList(),
                       ),
                     ),
@@ -92,11 +95,16 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
                             value: checkboxValue,
                             onChanged: (v) {
                               setSheetState(() => checkboxValue = v ?? true);
-                              setState(() => _showTutorialAtStartup = v ?? true);
+                              setState(
+                                () => _showTutorialAtStartup = v ?? true,
+                              );
                             },
                             activeColor: AppTheme.gold,
                             checkColor: AppTheme.bloodRed,
-                            side: const BorderSide(color: AppTheme.gold, width: 2),
+                            side: const BorderSide(
+                              color: AppTheme.gold,
+                              width: 2,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -131,7 +139,11 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
                               ),
                             );
                           }
-                          Navigator.pushNamed(context, '/game', arguments: type);
+                          Navigator.pushNamed(
+                            context,
+                            '/game',
+                            arguments: type,
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.gold,
@@ -235,37 +247,46 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _WorkoutButton(
-                      title: 'Squats',
-                      onPressed: () => _onWorkoutSelected(context, WorkoutType.squats),
-                    ),
-                    const SizedBox(height: 16),
-                    _WorkoutButton(
-                      title: 'Jumping Jacks',
-                      onPressed: () => _onWorkoutSelected(context, WorkoutType.jumpingJacks),
-                    ),
-                    const SizedBox(height: 16),
-                    _WorkoutButton(
-                      title: 'Side Crunches',
-                      onPressed: () => _onWorkoutSelected(context, WorkoutType.obliqueCrunches),
-                    ),
-                  ],
+      body: FitFusionAnimatedBackground(
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _WorkoutButton(
+                        title: 'Squats',
+                        onPressed: () =>
+                            _onWorkoutSelected(context, WorkoutType.squats),
+                      ),
+                      const SizedBox(height: 16),
+                      _WorkoutButton(
+                        title: 'Jumping Jacks',
+                        onPressed: () => _onWorkoutSelected(
+                          context,
+                          WorkoutType.jumpingJacks,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _WorkoutButton(
+                        title: 'Side Crunches',
+                        onPressed: () => _onWorkoutSelected(
+                          context,
+                          WorkoutType.obliqueCrunches,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          const UserProfileFooter(),
-        ],
+            const UserProfileFooter(),
+          ],
+        ),
       ),
     );
   }
@@ -275,10 +296,7 @@ class _WorkoutButton extends StatelessWidget {
   final String title;
   final VoidCallback onPressed;
 
-  const _WorkoutButton({
-    required this.title,
-    required this.onPressed,
-  });
+  const _WorkoutButton({required this.title, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -288,9 +306,7 @@ class _WorkoutButton extends StatelessWidget {
         backgroundColor: AppTheme.gold,
         foregroundColor: AppTheme.bloodRed,
         padding: const EdgeInsets.symmetric(vertical: 20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Text(
         title.toUpperCase(),

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../widgets/fitfusion_animated_background.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -56,9 +57,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     final newPassword = _passwordController.text;
 
     try {
-      await supabase.auth.updateUser(
-        UserAttributes(password: newPassword),
-      );
+      await supabase.auth.updateUser(UserAttributes(password: newPassword));
 
       // Sign out so user logs in with new password
       await supabase.auth.signOut();
@@ -95,10 +94,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppTheme.crimson,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppTheme.crimson),
     );
   }
 
@@ -106,128 +102,135 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bloodRed,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Text(
-                      'RESET PASSWORD',
-                      style: GoogleFonts.cinzelDecorative(
-                        color: AppTheme.gold,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+      body: FitFusionAnimatedBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Text(
+                        'RESET PASSWORD',
+                        style: GoogleFonts.cinzelDecorative(
+                          color: AppTheme.gold,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: Text(
-                      'You can reset your password now.\n'
-                      'Make sure you remember it now, or\n'
-                      'you can reset again later.',
-                      style: GoogleFonts.cinzel(
-                        color: AppTheme.creamWhite,
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Text(
+                        'You can reset your password now.\n'
+                        'Make sure you remember it now, or\n'
+                        'you can reset again later.',
+                        style: GoogleFonts.cinzel(
+                          color: AppTheme.creamWhite,
+                          fontSize: 11,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 36),
+
+                    // Password
+                    _buildLabel('PASSWORD'),
+                    const SizedBox(height: 6),
+                    _buildTextField(
+                      controller: _passwordController,
+                      validator: _validatePassword,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.next,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: AppTheme.gold,
+                          size: 20,
+                        ),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Minimum 10 characters',
+                      style: TextStyle(
+                        color: AppTheme.creamWhite.withValues(alpha: 0.6),
                         fontSize: 11,
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                  ),
-                  const SizedBox(height: 36),
+                    const SizedBox(height: 16),
 
-                  // Password
-                  _buildLabel('PASSWORD'),
-                  const SizedBox(height: 6),
-                  _buildTextField(
-                    controller: _passwordController,
-                    validator: _validatePassword,
-                    obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.next,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: AppTheme.gold,
-                        size: 20,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Minimum 10 characters',
-                    style: TextStyle(
-                      color: AppTheme.creamWhite.withValues(alpha: 0.6),
-                      fontSize: 11,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Confirm Password
-                  _buildLabel('CONFIRM PASSWORD'),
-                  const SizedBox(height: 6),
-                  _buildTextField(
-                    controller: _confirmPasswordController,
-                    validator: _validateConfirmPassword,
-                    obscureText: _obscureConfirmPassword,
-                    textInputAction: TextInputAction.done,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: AppTheme.gold,
-                        size: 20,
-                      ),
-                      onPressed: () => setState(
-                          () => _obscureConfirmPassword = !_obscureConfirmPassword),
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-
-                  // Reset Password button
-                  Center(
-                    child: SizedBox(
-                      width: 220,
-                      height: 50,
-                      child: OutlinedButton(
-                        onPressed: _isLoading ? null : _handleResetPassword,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.gold,
-                          side:
-                              const BorderSide(color: AppTheme.gold, width: 2),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                    // Confirm Password
+                    _buildLabel('CONFIRM PASSWORD'),
+                    const SizedBox(height: 6),
+                    _buildTextField(
+                      controller: _confirmPasswordController,
+                      validator: _validateConfirmPassword,
+                      obscureText: _obscureConfirmPassword,
+                      textInputAction: TextInputAction.done,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: AppTheme.gold,
+                          size: 20,
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: AppTheme.gold,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                'RESET PASSWORD',
-                                style: GoogleFonts.cinzelDecorative(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                        onPressed: () => setState(
+                          () => _obscureConfirmPassword =
+                              !_obscureConfirmPassword,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 36),
+
+                    // Reset Password button
+                    Center(
+                      child: SizedBox(
+                        width: 220,
+                        height: 50,
+                        child: OutlinedButton(
+                          onPressed: _isLoading ? null : _handleResetPassword,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.gold,
+                            side: const BorderSide(
+                              color: AppTheme.gold,
+                              width: 2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: AppTheme.gold,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  'RESET PASSWORD',
+                                  style: GoogleFonts.cinzelDecorative(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -269,8 +272,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       cursorColor: AppTheme.gold,
       decoration: InputDecoration(
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         suffixIcon: suffixIcon,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -288,10 +293,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppTheme.crimson, width: 2),
         ),
-        errorStyle: const TextStyle(
-          color: AppTheme.brightGold,
-          fontSize: 11,
-        ),
+        errorStyle: const TextStyle(color: AppTheme.brightGold, fontSize: 11),
       ),
     );
   }

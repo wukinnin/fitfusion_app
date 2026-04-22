@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../widgets/fitfusion_animated_background.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -84,10 +85,9 @@ class _SignupScreenState extends State<SignupScreen> {
 
     try {
       // Check email uniqueness
-      final emailExists = await supabase.rpc(
-        'check_email_exists',
-        params: {'p_email': email},
-      ) as bool;
+      final emailExists =
+          await supabase.rpc('check_email_exists', params: {'p_email': email})
+              as bool;
       if (emailExists) {
         // Email exists — check if verified
         // If not verified, redirect to verify screen
@@ -161,10 +161,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppTheme.crimson,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppTheme.crimson),
     );
   }
 
@@ -172,166 +169,176 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bloodRed,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Text(
-                      'SIGN UP',
-                      style: GoogleFonts.cinzelDecorative(
-                        color: AppTheme.gold,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Username
-                  _buildLabel('USERNAME'),
-                  const SizedBox(height: 6),
-                  _buildTextField(
-                    controller: _usernameController,
-                    validator: _validateUsername,
-                    keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Email
-                  _buildLabel('EMAIL'),
-                  const SizedBox(height: 6),
-                  _buildTextField(
-                    controller: _emailController,
-                    validator: _validateEmail,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Password
-                  _buildLabel('PASSWORD'),
-                  const SizedBox(height: 6),
-                  _buildTextField(
-                    controller: _passwordController,
-                    validator: _validatePassword,
-                    obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.next,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: AppTheme.gold,
-                        size: 20,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Minimum 10 characters',
-                    style: TextStyle(
-                      color: AppTheme.creamWhite.withValues(alpha: 0.6),
-                      fontSize: 11,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Confirm Password
-                  _buildLabel('CONFIRM PASSWORD'),
-                  const SizedBox(height: 6),
-                  _buildTextField(
-                    controller: _confirmPasswordController,
-                    validator: _validateConfirmPassword,
-                    obscureText: _obscureConfirmPassword,
-                    textInputAction: TextInputAction.done,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: AppTheme.gold,
-                        size: 20,
-                      ),
-                      onPressed: () => setState(
-                          () => _obscureConfirmPassword = !_obscureConfirmPassword),
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-
-                  // Sign Up button
-                  Center(
-                    child: SizedBox(
-                      width: 180,
-                      height: 50,
-                      child: OutlinedButton(
-                        onPressed: _isLoading ? null : _handleSignup,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.gold,
-                          side: const BorderSide(color: AppTheme.gold, width: 2),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+      body: FitFusionAnimatedBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Text(
+                        'SIGN UP',
+                        style: GoogleFonts.cinzelDecorative(
+                          color: AppTheme.gold,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: AppTheme.gold,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                'SIGN UP',
-                                style: GoogleFonts.cinzelDecorative(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 32),
+                    const SizedBox(height: 40),
 
-                  // Already have an account? Login
-                  Center(
-                    child: GestureDetector(
-                      onTap: () => Navigator.pushReplacementNamed(
-                          context, '/auth/login'),
-                      child: RichText(
-                        text: TextSpan(
-                          style: GoogleFonts.cinzel(
-                            color: AppTheme.creamWhite,
-                            fontSize: 12,
-                          ),
-                          children: [
-                            const TextSpan(text: 'ALREADY HAVE AN ACCOUNT? '),
-                            TextSpan(
-                              text: 'LOGIN',
-                              style: GoogleFonts.cinzel(
-                                color: AppTheme.gold,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                decoration: TextDecoration.underline,
-                                decorationColor: AppTheme.gold,
-                              ),
+                    // Username
+                    _buildLabel('USERNAME'),
+                    const SizedBox(height: 6),
+                    _buildTextField(
+                      controller: _usernameController,
+                      validator: _validateUsername,
+                      keyboardType: TextInputType.text,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Email
+                    _buildLabel('EMAIL'),
+                    const SizedBox(height: 6),
+                    _buildTextField(
+                      controller: _emailController,
+                      validator: _validateEmail,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Password
+                    _buildLabel('PASSWORD'),
+                    const SizedBox(height: 6),
+                    _buildTextField(
+                      controller: _passwordController,
+                      validator: _validatePassword,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.next,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: AppTheme.gold,
+                          size: 20,
+                        ),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Minimum 10 characters',
+                      style: TextStyle(
+                        color: AppTheme.creamWhite.withValues(alpha: 0.6),
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Confirm Password
+                    _buildLabel('CONFIRM PASSWORD'),
+                    const SizedBox(height: 6),
+                    _buildTextField(
+                      controller: _confirmPasswordController,
+                      validator: _validateConfirmPassword,
+                      obscureText: _obscureConfirmPassword,
+                      textInputAction: TextInputAction.done,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: AppTheme.gold,
+                          size: 20,
+                        ),
+                        onPressed: () => setState(
+                          () => _obscureConfirmPassword =
+                              !_obscureConfirmPassword,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 36),
+
+                    // Sign Up button
+                    Center(
+                      child: SizedBox(
+                        width: 180,
+                        height: 50,
+                        child: OutlinedButton(
+                          onPressed: _isLoading ? null : _handleSignup,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.gold,
+                            side: const BorderSide(
+                              color: AppTheme.gold,
+                              width: 2,
                             ),
-                          ],
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: AppTheme.gold,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  'SIGN UP',
+                                  style: GoogleFonts.cinzelDecorative(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 32),
+
+                    // Already have an account? Login
+                    Center(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pushReplacementNamed(
+                          context,
+                          '/auth/login',
+                        ),
+                        child: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.cinzel(
+                              color: AppTheme.creamWhite,
+                              fontSize: 12,
+                            ),
+                            children: [
+                              const TextSpan(text: 'ALREADY HAVE AN ACCOUNT? '),
+                              TextSpan(
+                                text: 'LOGIN',
+                                style: GoogleFonts.cinzel(
+                                  color: AppTheme.gold,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: AppTheme.gold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -375,8 +382,10 @@ class _SignupScreenState extends State<SignupScreen> {
       cursorColor: AppTheme.gold,
       decoration: InputDecoration(
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         suffixIcon: suffixIcon,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -394,10 +403,7 @@ class _SignupScreenState extends State<SignupScreen> {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppTheme.crimson, width: 2),
         ),
-        errorStyle: const TextStyle(
-          color: AppTheme.brightGold,
-          fontSize: 11,
-        ),
+        errorStyle: const TextStyle(color: AppTheme.brightGold, fontSize: 11),
       ),
     );
   }

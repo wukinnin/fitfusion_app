@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
+import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -98,55 +99,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
-                : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Game Tutorial Toggle
-                  _buildSectionHeader('GAME'),
-                  const SizedBox(height: 8),
-                  _buildToggleTile(
-                    label: 'Show Tutorial at Startup',
-                    value: _showTutorial,
-                    onChanged: _updateShowTutorial,
-                  ),
-                  const SizedBox(height: 16),
+      body: FitFusionAnimatedBackground(
+        child: Column(
+          children: [
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppTheme.gold),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Game Tutorial Toggle
+                          _buildSectionHeader('GAME'),
+                          const SizedBox(height: 8),
+                          _buildToggleTile(
+                            label: 'Show Tutorial at Startup',
+                            value: _showTutorial,
+                            onChanged: _updateShowTutorial,
+                          ),
+                          const SizedBox(height: 16),
 
-                  // Volume Slider
-                  _buildSectionHeader('AUDIO'),
-                  const SizedBox(height: 8),
-                  _buildVolumeSlider(),
-                  const SizedBox(height: 24),
+                          // Volume Slider
+                          _buildSectionHeader('AUDIO'),
+                          const SizedBox(height: 8),
+                          _buildVolumeSlider(),
+                          const SizedBox(height: 24),
 
-                  // Edit Profile
-                  _buildSectionHeader('ACCOUNT'),
-                  const SizedBox(height: 8),
-                  _buildNavigationTile(
-                    icon: Icons.person_outline,
-                    label: 'Edit Profile',
-                    onTap: () => Navigator.pushNamed(context, '/settings/edit-profile'),
-                  ),
-                  const SizedBox(height: 8),
+                          // Edit Profile
+                          _buildSectionHeader('ACCOUNT'),
+                          const SizedBox(height: 8),
+                          _buildNavigationTile(
+                            icon: Icons.person_outline,
+                            label: 'Edit Profile',
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              '/settings/edit-profile',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
 
-                  // Log Out
-                  _buildActionTile(
-                    icon: Icons.logout,
-                    label: 'Log Out',
-                    color: AppTheme.crimson,
-                    onTap: () => _handleLogOut(),
-                  ),
-                ],
-              ),
+                          // Log Out
+                          _buildActionTile(
+                            icon: Icons.logout,
+                            label: 'Log Out',
+                            color: AppTheme.crimson,
+                            onTap: () => _handleLogOut(),
+                          ),
+                        ],
+                      ),
+                    ),
             ),
-          ),
-          const UserProfileFooter(),
-        ],
+            const UserProfileFooter(),
+          ],
+        ),
       ),
     );
   }

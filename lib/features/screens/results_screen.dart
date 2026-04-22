@@ -5,6 +5,7 @@ import '../../core/constants.dart';
 import '../../core/enums.dart';
 import '../../core/theme.dart';
 import '../game/game_session.dart';
+import '../../widgets/fitfusion_animated_background.dart';
 
 class ResultsScreen extends StatefulWidget {
   const ResultsScreen({super.key});
@@ -28,20 +29,17 @@ class _ResultsScreenState extends State<ResultsScreen>
       vsync: this,
       duration: const Duration(seconds: 1),
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(-1.0, 0.0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-    _heartsSlideAnimation = Tween<Offset>(
-      begin: const Offset(0.0, 0.8),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(-1.0, 0.0), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
+    _heartsSlideAnimation =
+        Tween<Offset>(begin: const Offset(0.0, 0.8), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _slideController,
+            curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
+          ),
+        );
     _slideController.forward();
   }
 
@@ -88,15 +86,21 @@ class _ResultsScreenState extends State<ResultsScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.bloodRed,
-        title: const Text('Retry?',
-            style: TextStyle(color: AppTheme.gold, fontWeight: FontWeight.bold)),
-        content: const Text('Are you sure you want to retry?',
-            style: TextStyle(color: AppTheme.creamWhite)),
+        title: const Text(
+          'Retry?',
+          style: TextStyle(color: AppTheme.gold, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Are you sure you want to retry?',
+          style: TextStyle(color: AppTheme.creamWhite),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.creamWhite)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.creamWhite),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -120,15 +124,21 @@ class _ResultsScreenState extends State<ResultsScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.bloodRed,
-        title: const Text('Quit?',
-            style: TextStyle(color: AppTheme.gold, fontWeight: FontWeight.bold)),
-        content: const Text('Are you sure you want to quit?',
-            style: TextStyle(color: AppTheme.creamWhite)),
+        title: const Text(
+          'Quit?',
+          style: TextStyle(color: AppTheme.gold, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Are you sure you want to quit?',
+          style: TextStyle(color: AppTheme.creamWhite),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.creamWhite)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.creamWhite),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -139,7 +149,10 @@ class _ResultsScreenState extends State<ResultsScreen>
                 (route) => false,
               );
             },
-            child: const Text('Quit', style: TextStyle(color: AppTheme.crimson)),
+            child: const Text(
+              'Quit',
+              style: TextStyle(color: AppTheme.crimson),
+            ),
           ),
         ],
       ),
@@ -163,7 +176,9 @@ class _ResultsScreenState extends State<ResultsScreen>
     if (session == null) {
       return const Scaffold(
         backgroundColor: AppTheme.bloodRed,
-        body: Center(child: CircularProgressIndicator(color: AppTheme.gold)),
+        body: FitFusionAnimatedBackground(
+          child: Center(child: CircularProgressIndicator(color: AppTheme.gold)),
+        ),
       );
     }
 
@@ -178,135 +193,176 @@ class _ResultsScreenState extends State<ResultsScreen>
       canPop: false,
       child: Scaffold(
         backgroundColor: AppTheme.bloodRed,
-        body: Stack(
-          children: [
-            Container(color: tintColor),
-            SlideTransition(
-              position: _slideAnimation,
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 32),
-                      Text(
-                        headerText,
-                        style: TextStyle(
-                          color: headerColor,
-                          fontSize: 56,
-                          fontWeight: FontWeight.bold,
-                          fontStyle: FontStyle.italic,
-                          shadows: const [
-                            Shadow(blurRadius: 8, color: Colors.black),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppTheme.gold.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildStatRow('Clear Time:', _formatTime(session.totalTimeSeconds), forfeit: !isVictory),
-                            const SizedBox(height: 8),
-                            _buildStatRow('Rounds Complete:', '${session.roundsCompleted} / $kTotalRounds'),
-                            const SizedBox(height: 8),
-                            _buildStatRow('Reps Finished:', '${session.totalReps} / ${session.totalRepsRequired}'),
-                            const SizedBox(height: 8),
-                            _buildStatRow('Best Rep Interval:', session.bestRepIntervalSeconds > 0 ? '${session.bestRepIntervalSeconds.toStringAsFixed(2)}s' : '--', forfeit: !isVictory),
-                            const SizedBox(height: 8),
-                            _buildStatRow('Avg Rep Interval:', session.avgRepIntervalSeconds > 0 ? '${session.avgRepIntervalSeconds.toStringAsFixed(2)}s' : '--', forfeit: !isVictory),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      if (isVictory)
+        body: FitFusionAnimatedBackground(
+          child: Stack(
+            children: [
+              Container(color: tintColor),
+              SlideTransition(
+                position: _slideAnimation,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 32),
                         Text(
-                          'You have defeated all $kTotalRounds monsters!',
-                          style: const TextStyle(
-                            color: AppTheme.creamWhite,
-                            fontSize: 16,
+                          headerText,
+                          style: TextStyle(
+                            color: headerColor,
+                            fontSize: 56,
+                            fontWeight: FontWeight.bold,
                             fontStyle: FontStyle.italic,
+                            shadows: const [
+                              Shadow(blurRadius: 8, color: Colors.black),
+                            ],
                           ),
-                          textAlign: TextAlign.center,
                         ),
-                      const Spacer(),
-                      SizedBox(
-                        width: 200,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _onRetry,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.gold,
-                            foregroundColor: AppTheme.bloodRed,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                        const SizedBox(height: 24),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppTheme.gold.withValues(alpha: 0.3),
                             ),
                           ),
-                          child: const Text('RETRY',
-                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: 200,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _onQuit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.gold,
-                            foregroundColor: AppTheme.bloodRed,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: const Text('QUIT',
-                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                      SlideTransition(
-                        position: _heartsSlideAnimation,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(kStartingLives, (i) {
-                            final alive = i < (kStartingLives - session.livesLost);
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: Icon(
-                                Icons.favorite,
-                                color: alive ? const Color(0xFF1A3A8A) : AppTheme.crimson,
-                                size: 28,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildStatRow(
+                                'Clear Time:',
+                                _formatTime(session.totalTimeSeconds),
+                                forfeit: !isVictory,
                               ),
-                            );
-                          }),
+                              const SizedBox(height: 8),
+                              _buildStatRow(
+                                'Rounds Complete:',
+                                '${session.roundsCompleted} / $kTotalRounds',
+                              ),
+                              const SizedBox(height: 8),
+                              _buildStatRow(
+                                'Reps Finished:',
+                                '${session.totalReps} / ${session.totalRepsRequired}',
+                              ),
+                              const SizedBox(height: 8),
+                              _buildStatRow(
+                                'Best Rep Interval:',
+                                session.bestRepIntervalSeconds > 0
+                                    ? '${session.bestRepIntervalSeconds.toStringAsFixed(2)}s'
+                                    : '--',
+                                forfeit: !isVictory,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildStatRow(
+                                'Avg Rep Interval:',
+                                session.avgRepIntervalSeconds > 0
+                                    ? '${session.avgRepIntervalSeconds.toStringAsFixed(2)}s'
+                                    : '--',
+                                forfeit: !isVictory,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _workoutLabel(session.workoutType),
-                        style: const TextStyle(
-                          color: AppTheme.gold,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          shadows: [Shadow(blurRadius: 4, color: Colors.black)],
+                        const SizedBox(height: 24),
+                        if (isVictory)
+                          Text(
+                            'You have defeated all $kTotalRounds monsters!',
+                            style: const TextStyle(
+                              color: AppTheme.creamWhite,
+                              fontSize: 16,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        const Spacer(),
+                        SizedBox(
+                          width: 200,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: _onRetry,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.gold,
+                              foregroundColor: AppTheme.bloodRed,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text(
+                              'RETRY',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: 200,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: _onQuit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.gold,
+                              foregroundColor: AppTheme.bloodRed,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text(
+                              'QUIT',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        SlideTransition(
+                          position: _heartsSlideAnimation,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(kStartingLives, (i) {
+                              final alive =
+                                  i < (kStartingLives - session.livesLost);
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                child: Icon(
+                                  Icons.favorite,
+                                  color: alive
+                                      ? const Color(0xFF1A3A8A)
+                                      : AppTheme.crimson,
+                                  size: 28,
+                                ),
+                              );
+                            }),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _workoutLabel(session.workoutType),
+                          style: const TextStyle(
+                            color: AppTheme.gold,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(blurRadius: 4, color: Colors.black),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -319,7 +375,9 @@ class _ResultsScreenState extends State<ResultsScreen>
     final valueColor = forfeit
         ? AppTheme.creamWhite.withValues(alpha: 0.35)
         : AppTheme.creamWhite;
-    final decoration = forfeit ? TextDecoration.lineThrough : TextDecoration.none;
+    final decoration = forfeit
+        ? TextDecoration.lineThrough
+        : TextDecoration.none;
     final decorationColor = forfeit
         ? AppTheme.creamWhite.withValues(alpha: 0.5)
         : null;

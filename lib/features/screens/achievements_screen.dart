@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/enums.dart';
 import '../../core/extensions.dart';
 import '../../core/theme.dart';
+import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
 import '../achievements/achievement_service.dart';
 
@@ -58,11 +59,19 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
-                : _buildAchievementsList(),
+            child: FitFusionAnimatedBackground(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppTheme.gold),
+                    )
+                  : Column(
+                      children: [
+                        Expanded(child: _buildAchievementsList()),
+                        const UserProfileFooter(),
+                      ],
+                    ),
+            ),
           ),
-          const UserProfileFooter(),
         ],
       ),
     );
@@ -164,10 +173,7 @@ class _AchievementTile extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   description,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: textColor, fontSize: 12),
                 ),
                 if (unlocked && unlockedAt != null) ...[
                   const SizedBox(height: 4),
@@ -193,8 +199,18 @@ class _AchievementTile extends StatelessWidget {
 
   static String _formatDate(DateTime dt) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final local = dt.toLocal();
     return '${months[local.month - 1]} ${local.day}, ${local.year}';

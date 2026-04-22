@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../widgets/fitfusion_animated_background.dart';
 import '../../../widgets/user_profile_footer.dart';
 
 class ChangeEmailScreen extends StatefulWidget {
@@ -122,10 +123,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppTheme.crimson,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppTheme.crimson),
     );
   }
 
@@ -149,99 +147,110 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 16),
-            TextField(
-              controller: _currentPasswordController,
-              obscureText: _obscurePassword,
-              style: GoogleFonts.crimsonText(color: AppTheme.creamWhite),
-              decoration: InputDecoration(
-                labelText: 'Current Password',
-                labelStyle: GoogleFonts.crimsonText(
-                  color: AppTheme.creamWhite.withValues(alpha: 0.6),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(
-                      color: AppTheme.gold.withValues(alpha: 0.3)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide:
-                      const BorderSide(color: AppTheme.gold, width: 2),
-                ),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_off
-                        : Icons.visibility,
-                    color: AppTheme.gold.withValues(alpha: 0.6),
-                  ),
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildTextField(
-              controller: _newEmailController,
-              label: 'New Email',
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 16),
-            _buildTextField(
-              controller: _confirmEmailController,
-              label: 'Confirm New Email',
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Must be unique and not already taken. You\'ll receive a 6-digit code at the new email.',
-              style: TextStyle(
-                color: AppTheme.creamWhite.withValues(alpha: 0.5),
-                fontSize: 12,
-              ),
-            ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleChangeEmail,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.gold,
-                        foregroundColor: AppTheme.bloodRed,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+      body: FitFusionAnimatedBackground(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _currentPasswordController,
+                      obscureText: _obscurePassword,
+                      style: GoogleFonts.crimsonText(
+                        color: AppTheme.creamWhite,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Current Password',
+                        labelStyle: GoogleFonts.crimsonText(
+                          color: AppTheme.creamWhite.withValues(alpha: 0.6),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                            color: AppTheme.gold.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: AppTheme.gold,
+                            width: 2,
+                          ),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: AppTheme.gold.withValues(alpha: 0.6),
+                          ),
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                         ),
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: AppTheme.bloodRed,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              'CHANGE EMAIL',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    _buildTextField(
+                      controller: _newEmailController,
+                      label: 'New Email',
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _confirmEmailController,
+                      label: 'Confirm New Email',
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Must be unique and not already taken. You\'ll receive a 6-digit code at the new email.',
+                      style: TextStyle(
+                        color: AppTheme.creamWhite.withValues(alpha: 0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleChangeEmail,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.gold,
+                          foregroundColor: AppTheme.bloodRed,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: AppTheme.bloodRed,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'CHANGE EMAIL',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const UserProfileFooter(),
-        ],
+            const UserProfileFooter(),
+          ],
+        ),
       ),
     );
   }
@@ -262,8 +271,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              BorderSide(color: AppTheme.gold.withValues(alpha: 0.3)),
+          borderSide: BorderSide(color: AppTheme.gold.withValues(alpha: 0.3)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../widgets/fitfusion_animated_background.dart';
 import '../../../widgets/user_profile_footer.dart';
 
 class ResetPasswordSettingsScreen extends StatefulWidget {
@@ -89,10 +90,7 @@ class _ResetPasswordSettingsScreenState
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppTheme.crimson,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppTheme.crimson),
     );
   }
 
@@ -116,77 +114,84 @@ class _ResetPasswordSettingsScreenState
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 16),
-            _buildPasswordField(
-              controller: _currentPasswordController,
-              label: 'Current Password',
-              obscure: _obscureCurrent,
-              onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
-            ),
-            const SizedBox(height: 20),
-            _buildPasswordField(
-              controller: _newPasswordController,
-              label: 'New Password',
-              obscure: _obscureNew,
-              onToggle: () => setState(() => _obscureNew = !_obscureNew),
-            ),
-            const SizedBox(height: 16),
-            _buildPasswordField(
-              controller: _confirmPasswordController,
-              label: 'Confirm New Password',
-              obscure: _obscureConfirm,
-              onToggle: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Minimum 10 characters',
-              style: TextStyle(
-                color: AppTheme.creamWhite.withValues(alpha: 0.5),
-                fontSize: 12,
-              ),
-            ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleChangePassword,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.gold,
-                        foregroundColor: AppTheme.bloodRed,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: AppTheme.bloodRed,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              'CHANGE PASSWORD',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
+      body: FitFusionAnimatedBackground(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildPasswordField(
+                      controller: _currentPasswordController,
+                      label: 'Current Password',
+                      obscure: _obscureCurrent,
+                      onToggle: () =>
+                          setState(() => _obscureCurrent = !_obscureCurrent),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    _buildPasswordField(
+                      controller: _newPasswordController,
+                      label: 'New Password',
+                      obscure: _obscureNew,
+                      onToggle: () =>
+                          setState(() => _obscureNew = !_obscureNew),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildPasswordField(
+                      controller: _confirmPasswordController,
+                      label: 'Confirm New Password',
+                      obscure: _obscureConfirm,
+                      onToggle: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Minimum 10 characters',
+                      style: TextStyle(
+                        color: AppTheme.creamWhite.withValues(alpha: 0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleChangePassword,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.gold,
+                          foregroundColor: AppTheme.bloodRed,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: AppTheme.bloodRed,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'CHANGE PASSWORD',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const UserProfileFooter(),
-        ],
+            const UserProfileFooter(),
+          ],
+        ),
       ),
     );
   }

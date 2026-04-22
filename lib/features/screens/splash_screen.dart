@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
+import '../../widgets/fitfusion_animated_background.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -29,14 +30,16 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bloodRed,
-      body: Center(
-        child: Text(
-          'FitFusion',
-          style: TextStyle(
-            color: AppTheme.gold,
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Cinzel',
+      body: FitFusionAnimatedBackground(
+        child: Center(
+          child: Text(
+            'FitFusion',
+            style: TextStyle(
+              color: AppTheme.gold,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Cinzel',
+            ),
           ),
         ),
       ),

@@ -195,7 +195,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Skip', style: TextStyle(color: AppTheme.creamWhite)),
+            child: const Text(
+              'Skip',
+              style: TextStyle(color: AppTheme.creamWhite),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -209,11 +212,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _navigateToResults(GameSession session) {
     if (!mounted) return;
-    Navigator.pushReplacementNamed(
-      context,
-      '/results',
-      arguments: session,
-    );
+    Navigator.pushReplacementNamed(context, '/results', arguments: session);
   }
 
   void _onBackPressed() {
@@ -243,8 +242,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.camera_alt_outlined,
-                    color: AppTheme.crimson, size: 64),
+                const Icon(
+                  Icons.camera_alt_outlined,
+                  color: AppTheme.crimson,
+                  size: 64,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Camera Permission Required',
@@ -262,9 +264,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     _initAll();
                   },
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.gold),
-                  child: const Text('Retry',
-                      style: TextStyle(color: AppTheme.bloodRed)),
+                    backgroundColor: AppTheme.gold,
+                  ),
+                  child: const Text(
+                    'Retry',
+                    style: TextStyle(color: AppTheme.bloodRed),
+                  ),
                 ),
               ],
             ),
@@ -277,8 +282,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       return Scaffold(
         backgroundColor: AppTheme.bloodRed,
         body: Center(
-          child: Text('Error: $_error',
-              style: const TextStyle(color: AppTheme.crimson)),
+          child: Text(
+            'Error: $_error',
+            style: const TextStyle(color: AppTheme.crimson),
+          ),
         ),
       );
     }
@@ -286,9 +293,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (!_initialized || _game == null) {
       return const Scaffold(
         backgroundColor: AppTheme.bloodRed,
-        body: Center(
-          child: CircularProgressIndicator(color: AppTheme.gold),
-        ),
+        body: Center(child: CircularProgressIndicator(color: AppTheme.gold)),
       );
     }
 

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
+import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
 
 class LeaderboardScreen extends StatefulWidget {
@@ -53,9 +54,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   Future<void> _fetchAll() async {
     try {
       // Fetch workout leaderboards (clear time + best rep interval per workout type)
-      final clearTimeRows = await _client
-          .from('v_top10_clear_time')
-          .select();
+      final clearTimeRows = await _client.from('v_top10_clear_time').select();
       final repIntervalRows = await _client
           .from('v_top10_best_rep_interval')
           .select();
@@ -64,34 +63,38 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         final dbKey = _workoutDbKeys[tab];
 
         // Clear time (metric 0)
-        final ctEntries = (clearTimeRows as List)
-            .where((r) => r['workout_type'] == dbKey)
-            .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
-            .toList()
-          ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
+        final ctEntries =
+            (clearTimeRows as List)
+                .where((r) => r['workout_type'] == dbKey)
+                .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
+                .toList()
+              ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
         _cache[_cacheKey(tab, 0)] = ctEntries;
 
         // Best rep interval (metric 1)
-        final riEntries = (repIntervalRows as List)
-            .where((r) => r['workout_type'] == dbKey)
-            .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
-            .toList()
-          ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
+        final riEntries =
+            (repIntervalRows as List)
+                .where((r) => r['workout_type'] == dbKey)
+                .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
+                .toList()
+              ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
         _cache[_cacheKey(tab, 1)] = riEntries;
       }
 
       // Fetch lifetime leaderboards
-      final repsRows = await _client
-          .from('v_top10_lifetime_reps')
-          .select();
+      final repsRows = await _client.from('v_top10_lifetime_reps').select();
       _cache[_cacheKey(3, 0)] = List<Map<String, dynamic>>.from(
-          (repsRows as List)..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int)));
+        (repsRows as List)
+          ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int)),
+      );
 
       final victoriesRows = await _client
           .from('v_top10_lifetime_victories')
           .select();
       _cache[_cacheKey(3, 1)] = List<Map<String, dynamic>>.from(
-          (victoriesRows as List)..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int)));
+        (victoriesRows as List)
+          ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int)),
+      );
     } catch (e) {
       assert(() {
         debugPrint('[LeaderboardScreen] Failed to fetch leaderboards: $e');
@@ -143,28 +146,35 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           indicatorWeight: 3,
           labelColor: AppTheme.gold,
           unselectedLabelColor: AppTheme.creamWhite.withValues(alpha: 0.5),
-          labelStyle: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold),
+          labelStyle: GoogleFonts.cinzel(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
           unselectedLabelStyle: GoogleFonts.cinzel(fontSize: 12),
           tabs: _workoutTabs.map((t) => Tab(text: t)).toList(),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildWorkoutTab(0),
-                      _buildWorkoutTab(1),
-                      _buildWorkoutTab(2),
-                      _buildLifetimeTab(),
-                    ],
-                  ),
-          ),
-          const UserProfileFooter(),
-        ],
+      body: FitFusionAnimatedBackground(
+        child: Column(
+          children: [
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppTheme.gold),
+                    )
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildWorkoutTab(0),
+                        _buildWorkoutTab(1),
+                        _buildWorkoutTab(2),
+                        _buildLifetimeTab(),
+                      ],
+                    ),
+            ),
+            const UserProfileFooter(),
+          ],
+        ),
       ),
     );
   }
@@ -183,7 +193,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           onChanged: (i) => setState(() => _workoutMetricIndex[tabIndex] = i),
         ),
         const SizedBox(height: 8),
-        Expanded(child: _buildLeaderboardTable(entries: entries, isTime: isTime)),
+        Expanded(
+          child: _buildLeaderboardTable(entries: entries, isTime: isTime),
+        ),
       ],
     );
   }
@@ -199,7 +211,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           onChanged: (i) => setState(() => _lifetimeMetricIndex = i),
         ),
         const SizedBox(height: 8),
-        Expanded(child: _buildLeaderboardTable(entries: entries, isTime: false)),
+        Expanded(
+          child: _buildLeaderboardTable(entries: entries, isTime: false),
+        ),
       ],
     );
   }
@@ -239,7 +253,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                         ? AppTheme.gold
                         : AppTheme.creamWhite.withValues(alpha: 0.5),
                     fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
               ),

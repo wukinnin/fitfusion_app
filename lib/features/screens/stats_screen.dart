@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/enums.dart';
 import '../../core/extensions.dart';
 import '../../core/theme.dart';
+import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
 
 class StatsScreen extends StatefulWidget {
@@ -116,7 +117,8 @@ class _StatsScreenState extends State<StatsScreen>
         String bestRepInterval = '--';
         if (intervals.isNotEmpty) {
           bestRepInterval = _formatInterval(
-              intervals.reduce((a, b) => a < b ? a : b));
+            intervals.reduce((a, b) => a < b ? a : b),
+          );
         }
 
         // Avg rep interval (across all sessions)
@@ -127,14 +129,19 @@ class _StatsScreenState extends State<StatsScreen>
         String avgRepInterval = '--';
         if (avgIntervals.length >= 2) {
           avgRepInterval = _formatInterval(
-              avgIntervals.reduce((a, b) => a + b) / avgIntervals.length);
+            avgIntervals.reduce((a, b) => a + b) / avgIntervals.length,
+          );
         }
 
         // Lifetime stats per workout
         final totalRounds = wSessions.fold<int>(
-            0, (sum, s) => sum + ((s['rounds_completed'] as int?) ?? 0));
+          0,
+          (sum, s) => sum + ((s['rounds_completed'] as int?) ?? 0),
+        );
         final totalReps = wSessions.fold<int>(
-            0, (sum, s) => sum + ((s['total_reps'] as int?) ?? 0));
+          0,
+          (sum, s) => sum + ((s['total_reps'] as int?) ?? 0),
+        );
         final victories = wonSessions.length;
         final defeats = wSessions.where((s) => s['won'] == false).length;
 
@@ -208,28 +215,35 @@ class _StatsScreenState extends State<StatsScreen>
           indicatorWeight: 3,
           labelColor: AppTheme.gold,
           unselectedLabelColor: AppTheme.creamWhite.withValues(alpha: 0.5),
-          labelStyle: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold),
+          labelStyle: GoogleFonts.cinzel(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
           unselectedLabelStyle: GoogleFonts.cinzel(fontSize: 12),
           tabs: _tabs.map((t) => Tab(text: t)).toList(),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildWorkoutStatsTab(0),
-                      _buildWorkoutStatsTab(1),
-                      _buildWorkoutStatsTab(2),
-                      _buildOverallTab(),
-                    ],
-                  ),
-          ),
-          const UserProfileFooter(),
-        ],
+      body: FitFusionAnimatedBackground(
+        child: Column(
+          children: [
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppTheme.gold),
+                    )
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildWorkoutStatsTab(0),
+                        _buildWorkoutStatsTab(1),
+                        _buildWorkoutStatsTab(2),
+                        _buildOverallTab(),
+                      ],
+                    ),
+            ),
+            const UserProfileFooter(),
+          ],
+        ),
       ),
     );
   }
@@ -267,10 +281,16 @@ class _StatsScreenState extends State<StatsScreen>
         children: [
           _buildSectionHeader('LIFETIME TOTALS'),
           const SizedBox(height: 8),
-          _buildStatCard('Total Sessions', _overallStats['totalSessions'] ?? '0'),
+          _buildStatCard(
+            'Total Sessions',
+            _overallStats['totalSessions'] ?? '0',
+          ),
           _buildStatCard('Total Reps', _overallStats['totalReps'] ?? '0'),
           _buildStatCard('Total Rounds', _overallStats['totalRounds'] ?? '0'),
-          _buildStatCard('Total Victories', _overallStats['totalVictories'] ?? '0'),
+          _buildStatCard(
+            'Total Victories',
+            _overallStats['totalVictories'] ?? '0',
+          ),
         ],
       ),
     );
@@ -298,9 +318,7 @@ class _StatsScreenState extends State<StatsScreen>
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppTheme.gold.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

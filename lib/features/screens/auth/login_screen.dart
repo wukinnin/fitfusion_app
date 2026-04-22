@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../widgets/fitfusion_animated_background.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -71,10 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       // Sign in with Supabase Auth
-      await supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      await supabase.auth.signInWithPassword(email: email, password: password);
 
       // Check if email is verified
       final userId = supabase.auth.currentUser?.id;
@@ -103,11 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         setState(() => _isLoading = false);
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/home',
-          (route) => false,
-        );
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -124,10 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppTheme.crimson,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppTheme.crimson),
     );
   }
 
@@ -135,144 +126,153 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bloodRed,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Text(
-                      'LOGIN',
-                      style: GoogleFonts.cinzelDecorative(
-                        color: AppTheme.gold,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Email or Username
-                  _buildLabel('EMAIL OR USERNAME'),
-                  const SizedBox(height: 6),
-                  _buildTextField(
-                    controller: _identifierController,
-                    validator: _validateIdentifier,
-                    keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Password
-                  _buildLabel('PASSWORD'),
-                  const SizedBox(height: 6),
-                  _buildTextField(
-                    controller: _passwordController,
-                    validator: _validatePassword,
-                    obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.done,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: AppTheme.gold,
-                        size: 20,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Forgot Password
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: GestureDetector(
-                      onTap: () => Navigator.pushNamed(
-                          context, '/auth/forgot-password'),
+      body: FitFusionAnimatedBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
                       child: Text(
-                        'FORGOT PASSWORD?',
-                        style: GoogleFonts.cinzel(
+                        'LOGIN',
+                        style: GoogleFonts.cinzelDecorative(
                           color: AppTheme.gold,
-                          fontSize: 12,
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 32),
+                    const SizedBox(height: 40),
 
-                  // Login button
-                  Center(
-                    child: SizedBox(
-                      width: 180,
-                      height: 50,
-                      child: OutlinedButton(
-                        onPressed: _isLoading ? null : _handleLogin,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.gold,
-                          side:
-                              const BorderSide(color: AppTheme.gold, width: 2),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                    // Email or Username
+                    _buildLabel('EMAIL OR USERNAME'),
+                    const SizedBox(height: 6),
+                    _buildTextField(
+                      controller: _identifierController,
+                      validator: _validateIdentifier,
+                      keyboardType: TextInputType.text,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Password
+                    _buildLabel('PASSWORD'),
+                    const SizedBox(height: 6),
+                    _buildTextField(
+                      controller: _passwordController,
+                      validator: _validatePassword,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: AppTheme.gold,
+                          size: 20,
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: AppTheme.gold,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                'LOGIN',
-                                style: GoogleFonts.cinzelDecorative(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 32),
+                    const SizedBox(height: 12),
 
-                  // Don't have an account? Sign Up
-                  Center(
-                    child: GestureDetector(
-                      onTap: () => Navigator.pushReplacementNamed(
-                          context, '/auth/signup'),
-                      child: RichText(
-                        text: TextSpan(
+                    // Forgot Password
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: () => Navigator.pushNamed(
+                          context,
+                          '/auth/forgot-password',
+                        ),
+                        child: Text(
+                          'FORGOT PASSWORD?',
                           style: GoogleFonts.cinzel(
-                            color: AppTheme.creamWhite,
+                            color: AppTheme.gold,
                             fontSize: 12,
+                            fontWeight: FontWeight.bold,
                           ),
-                          children: [
-                            const TextSpan(text: "DON'T HAVE AN ACCOUNT? "),
-                            TextSpan(
-                              text: 'SIGN UP',
-                              style: GoogleFonts.cinzel(
-                                color: AppTheme.gold,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                decoration: TextDecoration.underline,
-                                decorationColor: AppTheme.gold,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 32),
+
+                    // Login button
+                    Center(
+                      child: SizedBox(
+                        width: 180,
+                        height: 50,
+                        child: OutlinedButton(
+                          onPressed: _isLoading ? null : _handleLogin,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.gold,
+                            side: const BorderSide(
+                              color: AppTheme.gold,
+                              width: 2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: AppTheme.gold,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  'LOGIN',
+                                  style: GoogleFonts.cinzelDecorative(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Don't have an account? Sign Up
+                    Center(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pushReplacementNamed(
+                          context,
+                          '/auth/signup',
+                        ),
+                        child: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.cinzel(
+                              color: AppTheme.creamWhite,
+                              fontSize: 12,
+                            ),
+                            children: [
+                              const TextSpan(text: "DON'T HAVE AN ACCOUNT? "),
+                              TextSpan(
+                                text: 'SIGN UP',
+                                style: GoogleFonts.cinzel(
+                                  color: AppTheme.gold,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: AppTheme.gold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -316,8 +316,10 @@ class _LoginScreenState extends State<LoginScreen> {
       cursorColor: AppTheme.gold,
       decoration: InputDecoration(
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         suffixIcon: suffixIcon,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -335,10 +337,7 @@ class _LoginScreenState extends State<LoginScreen> {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppTheme.crimson, width: 2),
         ),
-        errorStyle: const TextStyle(
-          color: AppTheme.brightGold,
-          fontSize: 11,
-        ),
+        errorStyle: const TextStyle(color: AppTheme.brightGold, fontSize: 11),
       ),
     );
   }
