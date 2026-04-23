@@ -60,7 +60,8 @@ class AppBgmService {
 
   static const String _menuTrack = 'music/menu.mp3';
   static const String _gameTrack = 'music/game.mp3';
-  static const double _bgmVolume = 0.40;
+  static const double _menuBgmVolume = 0.25;
+  static const double _gameBgmVolume = 0.50;
   static const String _volumePreferenceKey = 'global_audio_volume';
   static const int _fadeSteps = 10;
   static const Duration _fadeStepDuration = Duration(milliseconds: 50);
@@ -216,8 +217,14 @@ class AppBgmService {
   }
 
   double _targetVolumeForTrack(_BgmTrack track) {
-    if (track == _BgmTrack.none) return 0.0;
-    return _bgmVolume * _globalVolume;
+    switch (track) {
+      case _BgmTrack.none:
+        return 0.0;
+      case _BgmTrack.menu:
+        return _menuBgmVolume * _globalVolume;
+      case _BgmTrack.game:
+        return _gameBgmVolume * _globalVolume;
+    }
   }
 
   String _fileForTrack(_BgmTrack track) {

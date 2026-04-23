@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -7,11 +8,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants.dart';
 import '../../../core/enums.dart';
+import '../../../services/app_bgm_service.dart';
 import '../fitfusion_game.dart';
 
 enum _CooldownPhase { slideIn, countdown, slideOut }
 
-class CooldownOverlay extends PositionComponent with HasGameReference<FitFusionGame> {
+class CooldownOverlay extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   static const double slideInDuration = 1.0;
   static const double slideOutDuration = 1.0;
 
@@ -20,6 +23,7 @@ class CooldownOverlay extends PositionComponent with HasGameReference<FitFusionG
   _CooldownPhase _phase = _CooldownPhase.slideIn;
   double _phaseTimer = 0;
   double _countdownRemaining = kCooldownSeconds.toDouble();
+  int? _previousCountdownSecond;
   int _nextRound = 1;
   bool _isActive = false;
 
@@ -46,11 +50,13 @@ class CooldownOverlay extends PositionComponent with HasGameReference<FitFusionG
     _phase = _CooldownPhase.slideIn;
     _phaseTimer = 0;
     _countdownRemaining = kCooldownSeconds.toDouble();
+    _previousCountdownSecond = kCooldownSeconds;
     _isActive = true;
   }
 
   void stopCooldown() {
     _isActive = false;
+    _previousCountdownSecond = null;
   }
 
   bool get isActive => _isActive;
@@ -59,12 +65,15 @@ class CooldownOverlay extends PositionComponent with HasGameReference<FitFusionG
   Future<void> onLoad() async {
     await super.onLoad();
 
-    _exerciseImages[WorkoutType.squats] =
-        await game.images.load('game/squats.png');
-    _exerciseImages[WorkoutType.jumpingJacks] =
-        await game.images.load('game/jumping-jacks.png');
-    _exerciseImages[WorkoutType.obliqueCrunches] =
-        await game.images.load('game/side-crunches.png');
+    _exerciseImages[WorkoutType.squats] = await game.images.load(
+      'game/squats.png',
+    );
+    _exerciseImages[WorkoutType.jumpingJacks] = await game.images.load(
+      'game/jumping-jacks.png',
+    );
+    _exerciseImages[WorkoutType.obliqueCrunches] = await game.images.load(
+      'game/side-crunches.png',
+    );
   }
 
   @override
@@ -79,11 +88,32 @@ class CooldownOverlay extends PositionComponent with HasGameReference<FitFusionG
         if (_phaseTimer >= slideInDuration) {
           _phase = _CooldownPhase.countdown;
           _phaseTimer = 0;
+          _previousCountdownSecond = _countdownRemaining.ceil();
         }
         break;
 
       case _CooldownPhase.countdown:
+        final previousSecond =
+            _previousCountdownSecond ?? _countdownRemaining.ceil();
         _countdownRemaining -= dt;
+        final currentSecond = _countdownRemaining <= 0
+            ? 0
+            : _countdownRemaining.ceil();
+
+        if (currentSecond < previousSecond) {
+          for (
+            var crossedSecond = previousSecond - 1;
+            crossedSecond >= currentSecond;
+            crossedSecond--
+          ) {
+            if (crossedSecond >= 0 && crossedSecond < kCooldownSeconds) {
+              _playTickSafe();
+            }
+          }
+        }
+
+        _previousCountdownSecond = currentSecond;
+
         if (_countdownRemaining <= 0) {
           _countdownRemaining = 0;
           _phase = _CooldownPhase.slideOut;
@@ -171,8 +201,17 @@ class CooldownOverlay extends PositionComponent with HasGameReference<FitFusionG
       ..color = const Color(0xFFFFD700)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6;
-    final arcRect = Rect.fromCircle(center: Offset(centerX, centerY), radius: circleRadius);
-    canvas.drawArc(arcRect, -math.pi / 2, fraction * 2 * math.pi, false, arcPaint);
+    final arcRect = Rect.fromCircle(
+      center: Offset(centerX, centerY),
+      radius: circleRadius,
+    );
+    canvas.drawArc(
+      arcRect,
+      -math.pi / 2,
+      fraction * 2 * math.pi,
+      false,
+      arcPaint,
+    );
 
     // Circle border
     canvas.drawCircle(
@@ -245,4 +284,12 @@ class CooldownOverlay extends PositionComponent with HasGameReference<FitFusionG
 
   double _easeOutCubic(double t) => 1 - math.pow(1 - t, 3).toDouble();
   double _easeInCubic(double t) => t * t * t;
+
+  void _playTickSafe() {
+    try {
+      unawaited(AppBgmService.instance.playSfx('sfx/tick1.mp3'));
+    } catch (e) {
+      debugPrint('[CooldownOverlay] Audio error: $e');
+    }
+  }
 }
