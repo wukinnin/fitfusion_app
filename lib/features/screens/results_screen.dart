@@ -1,9 +1,9 @@
-import 'package:flame_audio/flame_audio.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
 import '../../core/enums.dart';
 import '../../core/theme.dart';
+import '../../services/app_bgm_service.dart';
 import '../game/game_session.dart';
 import '../../widgets/fitfusion_animated_background.dart';
 
@@ -60,9 +60,9 @@ class _ResultsScreenState extends State<ResultsScreen>
     _audioPlayed = true;
     try {
       if (_session!.won) {
-        FlameAudio.play('sfx/victory_orchestra.mp3');
+        AppBgmService.instance.playSfx('sfx/victory_orchestra.mp3');
       } else {
-        FlameAudio.play('sfx/lose_violin.mp3');
+        AppBgmService.instance.playSfx('sfx/lose_violin.mp3');
       }
     } catch (e) {
       debugPrint('[ResultsScreen] Audio error: $e');

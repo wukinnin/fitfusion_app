@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
+import '../../services/app_bgm_service.dart';
 import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
 
@@ -17,7 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static final _client = Supabase.instance.client;
 
   bool _showTutorial = true;
-  double _volume = 0.8;
+  double _volume = 1.0;
   bool _loading = true;
 
   @override
@@ -43,6 +44,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (row != null) {
         _showTutorial = (row['show_tutorial'] as bool?) ?? true;
       }
+
+      _volume = AppBgmService.instance.globalVolume;
     } catch (e) {
       assert(() {
         debugPrint('[SettingsScreen] Failed to load settings: $e');
@@ -77,6 +80,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
     }
+  }
+
+  Future<void> _updateVolume(double value) async {
+    setState(() => _volume = value);
+    await AppBgmService.instance.setGlobalVolume(value);
   }
 
   @override
@@ -249,10 +257,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               thumbColor: AppTheme.gold,
               overlayColor: AppTheme.gold.withValues(alpha: 0.15),
             ),
-            child: Slider(
-              value: _volume,
-              onChanged: (v) => setState(() => _volume = v),
-            ),
+            child: Slider(value: _volume, onChanged: _updateVolume),
           ),
         ],
       ),

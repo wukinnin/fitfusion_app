@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flame_audio/flame_audio.dart';
 import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+enum _BgmTrack { none, menu, game }
 
 bool shouldPlayMenuForRoute(String? routeName) {
   if (routeName == null) return false;
@@ -56,26 +59,75 @@ class AppBgmService {
   static final AppBgmService instance = AppBgmService._();
 
   static const String _menuTrack = 'music/menu.mp3';
-  static const double _menuVolume = 0.25;
+  static const String _gameTrack = 'music/game.mp3';
+  static const double _bgmVolume = 0.25;
+  static const String _volumePreferenceKey = 'global_audio_volume';
   static const int _fadeSteps = 10;
   static const Duration _fadeStepDuration = Duration(milliseconds: 50);
 
   bool _initialized = false;
   bool _isProcessing = false;
-  bool _shouldPlayMenu = false;
-  bool _menuTrackRunning = false;
+  int _transitionToken = 0;
+  String? _currentRouteName;
+  bool _gameplayRequested = false;
+  _BgmTrack _activeTrack = _BgmTrack.none;
   double _currentVolume = 0.0;
+  double _globalVolume = 1.0;
+
+  double get globalVolume => _globalVolume;
 
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
+    final prefs = await SharedPreferences.getInstance();
+    _globalVolume = prefs.getDouble(_volumePreferenceKey) ?? 1.0;
     await FlameAudio.bgm.initialize();
+  }
+
+  Future<void> setGlobalVolume(double value) async {
+    final clamped = value.clamp(0.0, 1.0).toDouble();
+    _globalVolume = clamped;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_volumePreferenceKey, clamped);
+
+    if (_activeTrack != _BgmTrack.none) {
+      _transitionToken++;
+      _pumpTransitionLoop();
+    }
+  }
+
+  Future<void> playSfx(String file, {double volume = 1.0}) async {
+    final effectiveVolume = (volume * _globalVolume).clamp(0.0, 1.0).toDouble();
+    await FlameAudio.play(file, volume: effectiveVolume);
   }
 
   void syncForRoute(String? routeName) {
     if (!_initialized) return;
 
-    _shouldPlayMenu = shouldPlayMenuForRoute(routeName);
+    _currentRouteName = routeName;
+
+    if (routeName != '/game') {
+      _gameplayRequested = false;
+    }
+
+    _transitionToken++;
+    _pumpTransitionLoop();
+  }
+
+  void startGameplayBgm() {
+    if (!_initialized) return;
+
+    _gameplayRequested = true;
+    _transitionToken++;
+    _pumpTransitionLoop();
+  }
+
+  void stopGameplayBgm() {
+    if (!_initialized) return;
+
+    _gameplayRequested = false;
+    _transitionToken++;
     _pumpTransitionLoop();
   }
 
@@ -89,19 +141,44 @@ class AppBgmService {
   Future<void> _processDesiredState() async {
     try {
       while (true) {
-        if (_shouldPlayMenu) {
-          await _playMenuFromStart();
-          await _fadeTo(_menuVolume, shouldContinue: () => _shouldPlayMenu);
-        } else if (_menuTrackRunning) {
-          await _fadeOutAndStop();
+        final token = _transitionToken;
+        final desiredTrack = _desiredTrack();
+
+        if (desiredTrack == _BgmTrack.none) {
+          if (_activeTrack == _BgmTrack.none) break;
+          await _fadeOutAndStop(token);
+        } else if (_activeTrack != desiredTrack) {
+          if (_activeTrack != _BgmTrack.none) {
+            await _fadeOutAndStop(token);
+            if (!_isCurrentToken(token)) {
+              continue;
+            }
+          }
+
+          await _playTrackFromStart(desiredTrack);
+          if (!_isCurrentToken(token)) {
+            continue;
+          }
+
+          await _fadeTo(
+            _targetVolumeForTrack(desiredTrack),
+            maxVolume: _targetVolumeForTrack(desiredTrack),
+            token: token,
+          );
+        } else {
+          await _fadeTo(
+            _targetVolumeForTrack(desiredTrack),
+            maxVolume: _targetVolumeForTrack(desiredTrack),
+            token: token,
+          );
         }
 
-        if (_isStableForDesiredState()) {
+        if (token == _transitionToken && _isStableForDesiredState()) {
           break;
         }
       }
     } catch (e) {
-      _menuTrackRunning = false;
+      _activeTrack = _BgmTrack.none;
       _currentVolume = 0.0;
       assert(() {
         debugPrint('[AppBgmService] Failed to update BGM state: $e');
@@ -116,36 +193,74 @@ class AppBgmService {
   }
 
   bool _isStableForDesiredState() {
-    if (_shouldPlayMenu) {
-      return _menuTrackRunning && (_currentVolume - _menuVolume).abs() < 0.001;
+    final desiredTrack = _desiredTrack();
+
+    if (desiredTrack == _BgmTrack.none) {
+      return _activeTrack == _BgmTrack.none;
     }
 
-    return !_menuTrackRunning;
+    return _activeTrack == desiredTrack &&
+        (_currentVolume - _targetVolumeForTrack(desiredTrack)).abs() < 0.001;
   }
 
-  Future<void> _playMenuFromStart() async {
-    if (_menuTrackRunning) return;
+  _BgmTrack _desiredTrack() {
+    if (_gameplayRequested && _currentRouteName == '/game') {
+      return _BgmTrack.game;
+    }
 
-    await FlameAudio.bgm.play(_menuTrack, volume: 0.0);
-    _menuTrackRunning = true;
+    if (shouldPlayMenuForRoute(_currentRouteName)) {
+      return _BgmTrack.menu;
+    }
+
+    return _BgmTrack.none;
+  }
+
+  double _targetVolumeForTrack(_BgmTrack track) {
+    if (track == _BgmTrack.none) return 0.0;
+    return _bgmVolume * _globalVolume;
+  }
+
+  String _fileForTrack(_BgmTrack track) {
+    switch (track) {
+      case _BgmTrack.none:
+        throw StateError('No audio file exists for the none track.');
+      case _BgmTrack.menu:
+        return _menuTrack;
+      case _BgmTrack.game:
+        return _gameTrack;
+    }
+  }
+
+  bool _isCurrentToken(int token) => token == _transitionToken;
+
+  Future<void> _playTrackFromStart(_BgmTrack track) async {
+    if (track == _BgmTrack.none) return;
+
+    await FlameAudio.bgm.play(_fileForTrack(track), volume: 0.0);
+    _activeTrack = track;
     _currentVolume = 0.0;
   }
 
-  Future<void> _fadeOutAndStop() async {
-    await _fadeTo(0.0, shouldContinue: () => !_shouldPlayMenu);
+  Future<void> _fadeOutAndStop(int token) async {
+    await _fadeTo(
+      0.0,
+      maxVolume: _targetVolumeForTrack(_activeTrack),
+      token: token,
+    );
 
-    if (_shouldPlayMenu || !_menuTrackRunning) return;
+    if (!_isCurrentToken(token) || _currentVolume > 0.001) return;
 
     await FlameAudio.bgm.stop();
-    _menuTrackRunning = false;
+    _activeTrack = _BgmTrack.none;
     _currentVolume = 0.0;
   }
 
   Future<void> _fadeTo(
     double targetVolume, {
-    required bool Function() shouldContinue,
+    required double maxVolume,
+    required int token,
   }) async {
-    if (!_menuTrackRunning) return;
+    if (_activeTrack == _BgmTrack.none) return;
 
     if ((_currentVolume - targetVolume).abs() < 0.001) {
       _currentVolume = targetVolume;
@@ -156,10 +271,10 @@ class AppBgmService {
     final stepDelta = (targetVolume - _currentVolume) / _fadeSteps;
 
     for (var step = 0; step < _fadeSteps; step++) {
-      if (!shouldContinue()) return;
+      if (!_isCurrentToken(token)) return;
 
       final nextVolume = (_currentVolume + stepDelta)
-          .clamp(0.0, _menuVolume)
+          .clamp(0.0, maxVolume)
           .toDouble();
       _currentVolume = step == _fadeSteps - 1 ? targetVolume : nextVolume;
       await FlameAudio.bgm.audioPlayer.setVolume(_currentVolume);

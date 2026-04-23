@@ -3,12 +3,12 @@ import 'dart:math';
 
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
-import 'package:flame_audio/flame_audio.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
 import '../../core/enums.dart';
 import '../../core/extensions.dart';
+import '../../services/app_bgm_service.dart';
 import 'components/achievement_popup.dart';
 import 'components/cooldown_overlay.dart';
 import 'components/damage_flash_overlay.dart';
@@ -100,15 +100,13 @@ class FitFusionGame extends FlameGame {
     // === TOP HUD LAYOUT ===
     // Row 1: Health bar — full width, near top
     const topY = 36.0;
-    _healthBar = MonsterHealthBar()
-      ..position = Vector2(12, topY);
+    _healthBar = MonsterHealthBar()..position = Vector2(12, topY);
     add(_healthBar);
 
     // Row 2: Monster (left) | Rep counter (center) | Pace timer (right)
     const row2Y = topY + MonsterHealthBar.barHeight + 8;
 
-    _monster = MonsterComponent()
-      ..position = Vector2(8, row2Y);
+    _monster = MonsterComponent()..position = Vector2(8, row2Y);
     add(_monster);
 
     _repProgress = RepProgressBar()
@@ -120,14 +118,14 @@ class FitFusionGame extends FlameGame {
     add(_paceIndicator);
 
     // === BOTTOM HUD LAYOUT (centered) ===
-    _roundBanner = RoundBanner()
-      ..position = Vector2(0, size.y - 130);
+    _roundBanner = RoundBanner()..position = Vector2(0, size.y - 130);
     add(_roundBanner);
 
     _livesDisplay = PlayerLivesDisplay()
       ..position = Vector2(
-          (size.x - PlayerLivesDisplay.totalWidth) / 2,
-          size.y - 80);
+        (size.x - PlayerLivesDisplay.totalWidth) / 2,
+        size.y - 80,
+      );
     add(_livesDisplay);
 
     // === OVERLAYS ===
@@ -246,6 +244,7 @@ class FitFusionGame extends FlameGame {
 
   @override
   void onRemove() {
+    AppBgmService.instance.stopGameplayBgm();
     _phaseController.close();
     super.onRemove();
   }
@@ -269,6 +268,7 @@ class FitFusionGame extends FlameGame {
     if (_sessionEnded) return;
     if (_phase == GamePhase.victory || _phase == GamePhase.defeat) return;
 
+    AppBgmService.instance.stopGameplayBgm();
     _playerLives = 0;
     _livesDisplay.setLives(0);
     _cooldownOverlay.stopCooldown();
@@ -281,6 +281,7 @@ class FitFusionGame extends FlameGame {
     _phase = GamePhase.cooldown;
     _phaseController.add(_phase);
 
+    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
     _paceIndicator.setActive(false);
 
@@ -299,6 +300,7 @@ class FitFusionGame extends FlameGame {
     _paceTimeRemaining = kPaceThresholdSeconds;
     _paceTimerActive = true;
     _paceIndicator.setActive(true);
+    AppBgmService.instance.startGameplayBgm();
   }
 
   // --- Internal Game Logic ---
@@ -341,8 +343,12 @@ class FitFusionGame extends FlameGame {
   void _spawnHitEffects() {
     // Slash at monster position
     final slashPos = Vector2(
-      _monster.position.x + MonsterComponent.displayWidth / 2 - SwordSlashComponent.slashWidth / 2,
-      _monster.position.y + MonsterComponent.displayHeight / 2 - SwordSlashComponent.slashHeight / 2,
+      _monster.position.x +
+          MonsterComponent.displayWidth / 2 -
+          SwordSlashComponent.slashWidth / 2,
+      _monster.position.y +
+          MonsterComponent.displayHeight / 2 -
+          SwordSlashComponent.slashHeight / 2,
     );
     add(SwordSlashComponent(startPosition: slashPos));
 
@@ -373,6 +379,7 @@ class FitFusionGame extends FlameGame {
 
   void _handleRoundWon() {
     _roundsCompleted++;
+    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
     _paceIndicator.setActive(false);
 
@@ -408,6 +415,7 @@ class FitFusionGame extends FlameGame {
   }
 
   void _handleDefeat() {
+    AppBgmService.instance.stopGameplayBgm();
     _phase = GamePhase.defeat;
     _phaseController.add(_phase);
     _finishSession(won: false);
@@ -417,6 +425,7 @@ class FitFusionGame extends FlameGame {
     if (_sessionEnded) return;
     _sessionEnded = true;
 
+    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
     _cooldownOverlay.stopCooldown();
 
@@ -480,7 +489,7 @@ class FitFusionGame extends FlameGame {
 
   void _playAudioSafe(String file) {
     try {
-      FlameAudio.play(file);
+      AppBgmService.instance.playSfx(file);
     } catch (e) {
       debugPrint('[FitFusionGame] Audio error: $e');
     }
