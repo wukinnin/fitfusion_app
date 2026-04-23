@@ -20,6 +20,9 @@ import 'features/screens/settings_screen.dart';
 import 'features/screens/splash_screen.dart';
 import 'features/screens/stats_screen.dart';
 import 'features/screens/workout_select_screen.dart';
+import 'services/app_bgm_service.dart';
+
+final AppBgmRouteObserver _appBgmRouteObserver = AppBgmRouteObserver();
 
 class FitFusionApp extends StatelessWidget {
   const FitFusionApp({super.key});
@@ -31,6 +34,7 @@ class FitFusionApp extends StatelessWidget {
       theme: AppTheme.theme,
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
+      navigatorObservers: [_appBgmRouteObserver],
       routes: {
         '/': (context) => const SplashScreen(),
         '/auth': (context) => const AuthLandingScreen(),
@@ -48,7 +52,8 @@ class FitFusionApp extends StatelessWidget {
         '/achievements': (context) => const AchievementsScreen(),
         '/settings': (context) => const SettingsScreen(),
         '/settings/edit-profile': (context) => const EditProfileScreen(),
-        '/settings/reset-password': (context) => const ResetPasswordSettingsScreen(),
+        '/settings/reset-password': (context) =>
+            const ResetPasswordSettingsScreen(),
         '/settings/change-username': (context) => const ChangeUsernameScreen(),
         '/settings/change-email': (context) => const ChangeEmailScreen(),
         '/settings/delete-account': (context) => const DeleteAccountScreen(),

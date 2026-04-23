@@ -87,6 +87,7 @@ flutter:
 
   assets:
     # --- Audio (Flame looks for assets/audio/) ---
+    - assets/audio/music/
     - assets/audio/sfx/
 
     # --- Images (Flame looks for assets/images/) ---

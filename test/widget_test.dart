@@ -10,9 +10,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fitfusion/app.dart';
 
 void main() {
-  testWidgets('App starts on Splash stub screen', (WidgetTester tester) async {
+  testWidgets('App starts on FitFusion splash screen', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const FitFusionApp());
 
-    expect(find.text('Splash'), findsOneWidget);
+    expect(find.text('FitFusion'), findsOneWidget);
   });
 }
