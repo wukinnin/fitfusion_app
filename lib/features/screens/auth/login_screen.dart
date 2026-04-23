@@ -75,12 +75,12 @@ class _LoginScreenState extends State<LoginScreen> {
       await supabase.auth.signInWithPassword(email: email, password: password);
 
       // Check if email is verified and whether admin forced a password reset
-      final userId = supabase.auth.currentUser?.id;
-      if (userId != null) {
+      final user = supabase.auth.currentUser;
+      if (user != null) {
         final rows = await supabase
             .from('users')
-            .select('is_email_verified, force_password_reset')
-            .eq('id', userId)
+            .select('is_email_verified')
+            .eq('id', user.id)
             .limit(1);
         if (rows.isNotEmpty && rows[0]['is_email_verified'] == false) {
           // Not verified — sign out, resend OTP, immediately redirect
@@ -98,7 +98,8 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
 
-        if (rows.isNotEmpty && rows[0]['force_password_reset'] == true) {
+        final forceReset = user.userMetadata?['force_password_reset'] == true;
+        if (forceReset) {
           // Admin forced a reset — route directly to reset screen.
           if (mounted) {
             setState(() => _isLoading = false);
