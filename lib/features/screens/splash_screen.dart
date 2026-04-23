@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
 import '../../widgets/fitfusion_animated_background.dart';
@@ -34,11 +35,10 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Center(
           child: Text(
             'FitFusion',
-            style: TextStyle(
+            style: GoogleFonts.cinzelDecorative(
               color: AppTheme.gold,
               fontSize: 32,
               fontWeight: FontWeight.bold,
-              fontFamily: 'Cinzel',
             ),
           ),
         ),

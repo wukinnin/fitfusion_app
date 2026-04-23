@@ -134,7 +134,7 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
                                   'You can toggle this again in Settings',
                                   style: TextStyle(color: AppTheme.creamWhite),
                                 ),
-                                backgroundColor: AppTheme.royalBlue,
+                                backgroundColor: AppTheme.bloodRed,
                                 duration: Duration(seconds: 3),
                               ),
                             );
