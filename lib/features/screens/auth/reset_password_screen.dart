@@ -59,6 +59,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     try {
       await supabase.auth.updateUser(UserAttributes(password: newPassword));
 
+      // Clear any admin-forced reset flag so future logins are not intercepted.
+      final uid = supabase.auth.currentUser?.id;
+      if (uid != null) {
+        await supabase
+            .from('users')
+            .update({'force_password_reset': false})
+            .eq('id', uid);
+      }
+
       // Sign out so user logs in with new password
       await supabase.auth.signOut();
 

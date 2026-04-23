@@ -74,12 +74,12 @@ class _LoginScreenState extends State<LoginScreen> {
       // Sign in with Supabase Auth
       await supabase.auth.signInWithPassword(email: email, password: password);
 
-      // Check if email is verified
+      // Check if email is verified and whether admin forced a password reset
       final userId = supabase.auth.currentUser?.id;
       if (userId != null) {
         final rows = await supabase
             .from('users')
-            .select('is_email_verified')
+            .select('is_email_verified, force_password_reset')
             .eq('id', userId)
             .limit(1);
         if (rows.isNotEmpty && rows[0]['is_email_verified'] == false) {
@@ -93,6 +93,19 @@ class _LoginScreenState extends State<LoginScreen> {
               context,
               '/auth/verify',
               arguments: {'email': email, 'type': 'signup'},
+            );
+          }
+          return;
+        }
+
+        if (rows.isNotEmpty && rows[0]['force_password_reset'] == true) {
+          // Admin forced a reset — route directly to reset screen.
+          if (mounted) {
+            setState(() => _isLoading = false);
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/auth/reset-password',
+              (route) => route.settings.name == '/auth',
             );
           }
           return;
