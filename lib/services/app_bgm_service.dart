@@ -60,8 +60,8 @@ class AppBgmService {
 
   static const String _menuTrack = 'music/menu.mp3';
   static const String _gameTrack = 'music/game.mp3';
-  static const double _menuBgmVolume = 0.25;
-  static const double _gameBgmVolume = 0.50;
+  static const double _menuBgmVolume = 0.75;
+  static const double _gameBgmVolume = 0.5;
   static const String _volumePreferenceKey = 'global_audio_volume';
   static const int _fadeSteps = 10;
   static const Duration _fadeStepDuration = Duration(milliseconds: 50);
