@@ -41,16 +41,16 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       // Re-authenticate with current password
       await supabase.auth.signInWithPassword(email: email, password: currentPw);
 
-      // Call delete-player edge function
-      final response = await supabase.functions.invoke(
-        'delete-player',
-        body: {'user_id': userId},
+      // Call delete-user RPC
+      final response = await supabase.rpc(
+        'rpc_delete_user',
+        params: {'target_user_id': userId},
       );
 
-      if (response.data != null && response.data['error'] != null) {
+      if (response != null && response is Map && response['error'] != null) {
         if (mounted) {
           setState(() => _isLoading = false);
-          _showError(response.data['error']);
+          _showError(response['error']);
         }
         return;
       }

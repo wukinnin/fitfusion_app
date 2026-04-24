@@ -17,9 +17,14 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
-        final session = Supabase.instance.client.auth.currentSession;
-        if (session != null) {
-          Navigator.pushReplacementNamed(context, '/home');
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user != null) {
+          final forceReset = user.userMetadata?['force_password_reset'] == true;
+          if (forceReset) {
+            Navigator.pushReplacementNamed(context, '/auth/reset-password');
+          } else {
+            Navigator.pushReplacementNamed(context, '/home');
+          }
         } else {
           Navigator.pushReplacementNamed(context, '/auth');
         }

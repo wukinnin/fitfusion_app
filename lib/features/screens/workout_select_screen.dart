@@ -15,6 +15,58 @@ class WorkoutSelectScreen extends StatefulWidget {
 
 class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
   bool _showTutorialAtStartup = true;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final row = await client
+          .from('users')
+          .select('show_tutorial')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (row != null && mounted) {
+        setState(() {
+          _showTutorialAtStartup = (row['show_tutorial'] as bool?) ?? true;
+          _isLoading = false;
+        });
+      } else if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _updateShowTutorial(bool value) async {
+    setState(() => _showTutorialAtStartup = value);
+
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await client
+          .from('users')
+          .update({'show_tutorial': value})
+          .eq('id', user.id);
+    } catch (e) {
+      debugPrint('[WorkoutSelectScreen] Failed to update show_tutorial: $e');
+    }
+  }
 
   void _onWorkoutSelected(BuildContext context, WorkoutType type) {
     if (_showTutorialAtStartup) {
@@ -94,10 +146,9 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
                           child: Checkbox(
                             value: checkboxValue,
                             onChanged: (v) {
-                              setSheetState(() => checkboxValue = v ?? true);
-                              setState(
-                                () => _showTutorialAtStartup = v ?? true,
-                              );
+                              final newVal = v ?? true;
+                              setSheetState(() => checkboxValue = newVal);
+                              _updateShowTutorial(newVal);
                             },
                             activeColor: AppTheme.gold,
                             checkColor: AppTheme.bloodRed,
@@ -248,8 +299,12 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
         centerTitle: true,
       ),
       body: FitFusionAnimatedBackground(
-        child: Column(
-          children: [
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppTheme.gold),
+              )
+            : Column(
+                children: [
             Expanded(
               child: Center(
                 child: Padding(

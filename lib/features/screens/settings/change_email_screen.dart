@@ -93,7 +93,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
         // User cancelled or failed verification — roll back the pending
         // email_change on auth.users so no stale state is left behind.
         try {
-          await supabase.functions.invoke('cancel-email-change');
+          await supabase.rpc('rpc_cancel_email_change');
         } catch (_) {
           // Best-effort cleanup; ignore failures.
         }
