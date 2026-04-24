@@ -50,7 +50,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   String _email = '';
-  String _type = 'signup'; // 'signup', 'recovery', or 'email_change'
+  String _type = 'signup'; // 'signup', 'recovery', 'email_change', or 'delete_account'
 
   bool _returnOnSuccess = false;
   bool _argsParsed = false;
@@ -84,6 +84,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       final OtpType otpType;
       switch (_type) {
         case 'recovery':
+        case 'delete_account':
           otpType = OtpType.recovery;
           break;
         case 'email_change':
@@ -95,7 +96,22 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
       await supabase.auth.verifyOTP(email: _email, token: code, type: otpType);
 
-      if (_type == 'signup') {
+      if (_type == 'delete_account') {
+        // Final step: hard delete the account via RPC
+        final userId = supabase.auth.currentUser?.id;
+        if (userId != null) {
+          final response = await supabase.rpc(
+            'rpc_delete_user',
+            params: {'target_user_id': userId},
+          );
+
+          if (response != null && response is Map && response['error'] != null) {
+            throw AuthException(response['error']);
+          }
+        }
+        // Sign out and redirect to welcome
+        await supabase.auth.signOut();
+      } else if (_type == 'signup') {
         // Mark email as verified in public.users
         final userId = supabase.auth.currentUser?.id;
         if (userId != null) {
@@ -130,6 +146,13 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
             context,
             '/auth/reset-password',
             arguments: _email,
+          );
+        } else if (_type == 'delete_account') {
+          // Deletion: return to welcome screen
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/auth',
+            (route) => false,
           );
         } else {
           // Signup: go to login
@@ -166,7 +189,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     final supabase = Supabase.instance.client;
 
     try {
-      if (_type == 'recovery') {
+      if (_type == 'recovery' || _type == 'delete_account') {
         await supabase.auth.resetPasswordForEmail(_email);
       } else if (_type == 'email_change') {
         await supabase.auth.resend(type: OtpType.emailChange, email: _email);
@@ -215,9 +238,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'VERIFY EMAIL',
+                    _type == 'delete_account' ? 'CONFIRM DELETION' : 'VERIFY EMAIL',
                     style: GoogleFonts.cinzelDecorative(
-                      color: AppTheme.gold,
+                      color: _type == 'delete_account'
+                          ? AppTheme.crimson
+                          : AppTheme.gold,
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
                     ),
@@ -299,23 +324,32 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                     child: OutlinedButton(
                       onPressed: _isLoading ? null : _handleVerify,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.gold,
-                        side: const BorderSide(color: AppTheme.gold, width: 2),
+                        foregroundColor: _type == 'delete_account'
+                            ? AppTheme.crimson
+                            : AppTheme.gold,
+                        side: BorderSide(
+                          color: _type == 'delete_account'
+                              ? AppTheme.crimson
+                              : AppTheme.gold,
+                          width: 2,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: _isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 24,
                               height: 24,
                               child: CircularProgressIndicator(
-                                color: AppTheme.gold,
+                                color: _type == 'delete_account'
+                                    ? AppTheme.crimson
+                                    : AppTheme.gold,
                                 strokeWidth: 2,
                               ),
                             )
                           : Text(
-                              'VERIFY',
+                              _type == 'delete_account' ? 'DELETE' : 'VERIFY',
                               style: GoogleFonts.cinzelDecorative(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,

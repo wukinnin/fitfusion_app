@@ -38,28 +38,23 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     final userId = supabase.auth.currentUser!.id;
 
     try {
-      // Re-authenticate with current password
+      // 1. Re-authenticate with current password
       await supabase.auth.signInWithPassword(email: email, password: currentPw);
 
-      // Call delete-user RPC
-      final response = await supabase.rpc(
-        'rpc_delete_user',
-        params: {'target_user_id': userId},
-      );
-
-      if (response != null && response is Map && response['error'] != null) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          _showError(response['error']);
-        }
-        return;
-      }
-
-      // Sign out and navigate to auth landing
-      await supabase.auth.signOut();
+      // 2. Request deletion OTP (using recovery flow)
+      await supabase.auth.resetPasswordForEmail(email);
 
       if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
+        setState(() => _isLoading = false);
+        // 3. Navigate to verify screen
+        Navigator.pushNamed(
+          context,
+          '/auth/verify',
+          arguments: {
+            'email': email,
+            'type': 'delete_account',
+          },
+        );
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -239,7 +234,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                                       ),
                                     )
                                   : const Text(
-                                      'DELETE',
+                                      'SEND CODE',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,

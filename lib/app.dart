@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme.dart';
 import 'features/screens/achievements_screen.dart';
 import 'features/screens/auth/auth_landing_screen.dart';
@@ -24,12 +26,41 @@ import 'services/app_bgm_service.dart';
 
 final AppBgmRouteObserver _appBgmRouteObserver = AppBgmRouteObserver();
 
-class FitFusionApp extends StatelessWidget {
+class FitFusionApp extends StatefulWidget {
   const FitFusionApp({super.key});
+
+  @override
+  State<FitFusionApp> createState() => _FitFusionAppState();
+}
+
+class _FitFusionAppState extends State<FitFusionApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  late final StreamSubscription<AuthState> _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final session = data.session;
+      final event = data.event;
+
+      if (event == AuthChangeEvent.signedOut || (event == AuthChangeEvent.userDeleted)) {
+        // Force redirect to auth landing if session is lost
+        _navigatorKey.currentState?.pushNamedAndRemoveUntil('/auth', (route) => false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'FitFusion',
       theme: AppTheme.theme,
       debugShowCheckedModeBanner: false,
