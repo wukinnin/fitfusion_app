@@ -27,7 +27,7 @@ class _ResultsScreenState extends State<ResultsScreen>
     super.initState();
     _slideController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(milliseconds: 350),
     );
     _slideAnimation =
         Tween<Offset>(begin: const Offset(-1.0, 0.0), end: Offset.zero).animate(

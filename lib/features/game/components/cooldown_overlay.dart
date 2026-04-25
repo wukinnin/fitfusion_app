@@ -15,6 +15,7 @@ class CooldownOverlay extends PositionComponent
     with HasGameReference<FitFusionGame> {
   static const double slideInDuration = 1.0;
   static const double slideOutDuration = 1.0;
+  static const double _circleRadius = 52.0;
 
   final Map<WorkoutType, ui.Image> _exerciseImages = {};
   final Paint _tintPaint = Paint()..color = const Color(0x66000000);
@@ -53,6 +54,15 @@ class CooldownOverlay extends PositionComponent
   int _nextRound = 1;
   bool _isActive = false;
   bool _roundTextDirty = true;
+  double _cachedScreenW = -1;
+  double _cachedScreenH = -1;
+  Rect _screenRect = Rect.zero;
+  Offset _timerCenter = Offset.zero;
+  Rect _arcRect = Rect.zero;
+  bool _imageLayoutDirty = true;
+  ui.Image? _cachedImage;
+  Rect _imageSrcRect = Rect.zero;
+  Rect _imageDstRect = Rect.zero;
 
   VoidCallback? onCooldownComplete;
 
@@ -75,6 +85,7 @@ class CooldownOverlay extends PositionComponent
   void startCooldown(int nextRound) {
     _nextRound = nextRound;
     _roundTextDirty = true;
+    _imageLayoutDirty = true;
     _phase = _CooldownPhase.slideIn;
     _phaseTimer = 0;
     _countdownRemaining = kCooldownSeconds.toDouble();
@@ -149,6 +160,7 @@ class CooldownOverlay extends PositionComponent
 
     final screenW = game.size.x;
     final screenH = game.size.y;
+    _updateLayout(screenW, screenH);
 
     // Calculate slide offset
     double slideOffsetX = 0;
@@ -174,7 +186,7 @@ class CooldownOverlay extends PositionComponent
     canvas.translate(slideOffsetX, 0);
 
     // 40% black tint overlay
-    canvas.drawRect(Rect.fromLTWH(0, 0, screenW, screenH), _tintPaint);
+    canvas.drawRect(_screenRect, _tintPaint);
 
     // "ROUND X" header — top area
     if (_roundTextDirty) {
@@ -191,20 +203,15 @@ class CooldownOverlay extends PositionComponent
     );
 
     // Countdown circle — center area
-    final centerX = screenW / 2;
-    final centerY = screenH * 0.35;
-    final circleRadius = 52.0;
+    final centerX = _timerCenter.dx;
+    final centerY = _timerCenter.dy;
 
     // Countdown progress fraction
     final fraction = _countdownRemaining / kCooldownSeconds;
 
     // Pie-chart countdown
-    final arcRect = Rect.fromCircle(
-      center: Offset(centerX, centerY),
-      radius: circleRadius,
-    );
     canvas.drawArc(
-      arcRect,
+      _arcRect,
       -math.pi / 2,
       fraction * 2 * math.pi,
       false,
@@ -212,11 +219,7 @@ class CooldownOverlay extends PositionComponent
     );
 
     // Circle border
-    canvas.drawCircle(
-      Offset(centerX, centerY),
-      circleRadius,
-      _circlePaint,
-    );
+    canvas.drawCircle(_timerCenter, _circleRadius, _circlePaint);
 
     // Countdown number
     final seconds = _countdownRemaining.ceil();
@@ -230,40 +233,58 @@ class CooldownOverlay extends PositionComponent
     // Exercise illustration — below timer (contain-fit, no stretching)
     final image = _exerciseImages[game.workoutType];
     if (image != null) {
-      final imageTop = centerY + circleRadius + 24;
-      final maxWidth = math.min(screenW * 0.6, 280.0);
-      final maxHeight = math.min(screenH * 0.28, 200.0);
-
-      final imageAspect = image.width / image.height;
-      final boxAspect = maxWidth / maxHeight;
-
-      late final double drawWidth;
-      late final double drawHeight;
-      if (imageAspect > boxAspect) {
-        drawWidth = maxWidth;
-        drawHeight = maxWidth / imageAspect;
-      } else {
-        drawHeight = maxHeight;
-        drawWidth = maxHeight * imageAspect;
-      }
-
-      final dstRect = Rect.fromLTWH(
-        centerX - drawWidth / 2,
-        imageTop,
-        drawWidth,
-        drawHeight,
-      );
-      final srcRect = Rect.fromLTWH(
-        0,
-        0,
-        image.width.toDouble(),
-        image.height.toDouble(),
-      );
-
-      canvas.drawImageRect(image, srcRect, dstRect, _imagePaint);
+      _updateImageLayout(image, screenW, screenH);
+      canvas.drawImageRect(image, _imageSrcRect, _imageDstRect, _imagePaint);
     }
 
     canvas.restore();
+  }
+
+  void _updateLayout(double screenW, double screenH) {
+    if (_cachedScreenW == screenW && _cachedScreenH == screenH) return;
+
+    _cachedScreenW = screenW;
+    _cachedScreenH = screenH;
+    _screenRect = Rect.fromLTWH(0, 0, screenW, screenH);
+    _timerCenter = Offset(screenW / 2, screenH * 0.35);
+    _arcRect = Rect.fromCircle(center: _timerCenter, radius: _circleRadius);
+    _imageLayoutDirty = true;
+  }
+
+  void _updateImageLayout(ui.Image image, double screenW, double screenH) {
+    if (!_imageLayoutDirty && identical(_cachedImage, image)) return;
+
+    final imageTop = _timerCenter.dy + _circleRadius + 24;
+    final maxWidth = math.min(screenW * 0.6, 280.0);
+    final maxHeight = math.min(screenH * 0.28, 200.0);
+
+    final imageAspect = image.width / image.height;
+    final boxAspect = maxWidth / maxHeight;
+
+    late final double drawWidth;
+    late final double drawHeight;
+    if (imageAspect > boxAspect) {
+      drawWidth = maxWidth;
+      drawHeight = maxWidth / imageAspect;
+    } else {
+      drawHeight = maxHeight;
+      drawWidth = maxHeight * imageAspect;
+    }
+
+    _cachedImage = image;
+    _imageSrcRect = Rect.fromLTWH(
+      0,
+      0,
+      image.width.toDouble(),
+      image.height.toDouble(),
+    );
+    _imageDstRect = Rect.fromLTWH(
+      _timerCenter.dx - drawWidth / 2,
+      imageTop,
+      drawWidth,
+      drawHeight,
+    );
+    _imageLayoutDirty = false;
   }
 
   double _easeOutCubic(double t) => 1 - math.pow(1 - t, 3).toDouble();

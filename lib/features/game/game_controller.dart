@@ -24,6 +24,7 @@ class GameController {
   StreamSubscription<RepEvent>? _repSubscription;
   StreamSubscription<PaceEvent>? _paceSubscription;
   StreamSubscription<GamePhase>? _phaseSubscription;
+  Future<void>? _disposeFuture;
 
   GameController({
     required this.game,
@@ -77,9 +78,21 @@ class GameController {
   }
 
   Future<void> dispose() async {
-    await _repSubscription?.cancel();
-    await _paceSubscription?.cancel();
-    await _phaseSubscription?.cancel();
+    _disposeFuture ??= _disposeInternal();
+    await _disposeFuture;
+  }
+
+  Future<void> _disposeInternal() async {
+    final repSubscription = _repSubscription;
+    final paceSubscription = _paceSubscription;
+    final phaseSubscription = _phaseSubscription;
+    _repSubscription = null;
+    _paceSubscription = null;
+    _phaseSubscription = null;
+
+    await repSubscription?.cancel();
+    await paceSubscription?.cancel();
+    await phaseSubscription?.cancel();
     assert(() {
       debugPrint('[GameController] Disposed');
       return true;

@@ -39,7 +39,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(() => setState(() {}));
     _fetchAll();
   }
 

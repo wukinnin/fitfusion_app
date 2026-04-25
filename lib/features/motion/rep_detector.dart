@@ -52,6 +52,8 @@ class RepDetector {
 
   Stream<RepEvent> get repStream => _repController.stream;
   bool _isEnabled = false;
+  bool _isDisposed = false;
+  Future<void>? _disposeFuture;
 
   _SquatState _squatState = _SquatState.standing;
   double? _squatStandingBaseline;
@@ -108,6 +110,7 @@ class RepDetector {
   }
 
   void _onPose(Pose? pose) {
+    if (_isDisposed) return;
     if (!_isEnabled) return;
     if (pose == null) return;
 
@@ -125,11 +128,21 @@ class RepDetector {
   }
 
   Future<void> dispose() async {
+    _disposeFuture ??= _disposeInternal();
+    await _disposeFuture;
+  }
+
+  Future<void> _disposeInternal() async {
+    _isDisposed = true;
+    _isEnabled = false;
     await _poseSubscription.cancel();
-    await _repController.close();
+    if (!_repController.isClosed) {
+      await _repController.close();
+    }
   }
 
   void _emitRep() {
+    if (_isDisposed || _repController.isClosed) return;
     assert(() {
       debugPrint('[RepDetector] REP DETECTED — $workoutType');
       return true;
@@ -140,6 +153,7 @@ class RepDetector {
   }
 
   void setEnabled(bool enabled) {
+    if (_isDisposed) return;
     if (_isEnabled == enabled) return;
     _isEnabled = enabled;
     reset();

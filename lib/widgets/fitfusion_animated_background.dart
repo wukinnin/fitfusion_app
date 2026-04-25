@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -11,7 +12,7 @@ class FitFusionAnimatedBackground extends StatefulWidget {
   const FitFusionAnimatedBackground({
     super.key,
     required this.child,
-    this.circleCount = 15,
+    this.circleCount = 8,
   });
 
   @override
@@ -20,27 +21,32 @@ class FitFusionAnimatedBackground extends StatefulWidget {
 }
 
 class _FitFusionAnimatedBackgroundState
-    extends State<FitFusionAnimatedBackground>
-    with SingleTickerProviderStateMixin {
+    extends State<FitFusionAnimatedBackground> {
   static const double _travelDistance = 1000;
   static const Color _baseColor = Color.fromARGB(130, 255, 255, 255);
+  static const Duration _frameInterval = Duration(milliseconds: 83);
 
-  late final AnimationController _controller;
+  final Stopwatch _stopwatch = Stopwatch();
+  final ValueNotifier<double> _elapsedSeconds = ValueNotifier<double>(0);
+  Timer? _timer;
   late final List<_CircleSpec> _circles;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 60),
-    )..repeat();
     _circles = _generateCircles(widget.circleCount);
+    _stopwatch.start();
+    _timer = Timer.periodic(_frameInterval, (_) {
+      _elapsedSeconds.value =
+          _stopwatch.elapsedMicroseconds / Duration.microsecondsPerSecond;
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _timer?.cancel();
+    _stopwatch.stop();
+    _elapsedSeconds.dispose();
     super.dispose();
   }
 
@@ -64,25 +70,23 @@ class _FitFusionAnimatedBackgroundState
       children: [
         const DecoratedBox(decoration: BoxDecoration(color: AppTheme.bloodRed)),
         Positioned.fill(
-          child: IgnorePointer(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                final elapsedSeconds =
-                    _controller.duration!.inMilliseconds *
-                    _controller.value /
-                    1000.0;
-                return CustomPaint(
-                  painter: _FloatingCirclesPainter(
-                    circles: _circles,
-                    elapsedSeconds: elapsedSeconds,
-                  ),
-                );
-              },
+          child: RepaintBoundary(
+            child: IgnorePointer(
+              child: ValueListenableBuilder<double>(
+                valueListenable: _elapsedSeconds,
+                builder: (context, elapsedSeconds, _) {
+                  return CustomPaint(
+                    painter: _FloatingCirclesPainter(
+                      circles: _circles,
+                      elapsedSeconds: elapsedSeconds,
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ),
-        widget.child,
+        RepaintBoundary(child: widget.child),
       ],
     );
   }
@@ -99,6 +103,7 @@ class _FloatingCirclesPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paint = Paint();
     for (final circle in circles) {
       final progress = _animationProgress(circle);
       final center = Offset(
@@ -119,9 +124,10 @@ class _FloatingCirclesPainter extends CustomPainter {
 
       final rect = Rect.fromCircle(center: center, radius: circle.size / 2);
 
-      final paint = Paint()..shader = gradient.createShader(rect);
+      paint.shader = gradient.createShader(rect);
       canvas.drawCircle(center, circle.size / 2, paint);
     }
+    paint.shader = null;
   }
 
   double _animationProgress(_CircleSpec circle) {

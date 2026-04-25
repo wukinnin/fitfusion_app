@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flame/game.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +45,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _permissionDenied = false;
   bool _sessionEnded = false;
   bool _isSaving = false;
+  bool _isDisposed = false;
+  Future<void>? _shutdownRealtimePipelineFuture;
 
   WorkoutType _workoutType = WorkoutType.squats;
 
@@ -91,9 +95,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         if (mounted) setState(() => _permissionDenied = true);
         return;
       }
+      if (_isDisposed || !mounted) return;
 
       await _achievementService.init();
+      if (_isDisposed || !mounted) return;
+
       await _cameraService.initialize();
+      if (_isDisposed || !mounted) return;
 
       if (_cameraService.cameraDescription != null) {
         _poseDetectorService.startProcessing(
@@ -124,19 +132,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
       if (mounted) setState(() => _initialized = true);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (!_isDisposed && mounted) setState(() => _error = e.toString());
     }
   }
 
   void _onSessionComplete(GameSession session) {
     if (_sessionEnded) return;
     _sessionEnded = true;
-    _saveAndNavigate(session);
+    unawaited(_saveAndNavigate(session));
   }
 
   Future<void> _saveAndNavigate(GameSession session) async {
     // Show saving indicator
     if (mounted) setState(() => _isSaving = true);
+
+    await _shutdownRealtimePipeline();
+    if (mounted) setState(() {});
 
     // 1. Save session to Supabase
     bool saved = false;
@@ -221,14 +232,51 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _game?.forceDefeat();
   }
 
+  Future<void> _shutdownRealtimePipeline() {
+    _shutdownRealtimePipelineFuture ??= _shutdownRealtimePipelineInternal();
+    return _shutdownRealtimePipelineFuture!;
+  }
+
+  Future<void> _shutdownRealtimePipelineInternal() async {
+    final gameController = _gameController;
+    final repDetector = _repDetector;
+    _gameController = null;
+    _repDetector = null;
+
+    _poseDetectorService.setEnabled(false);
+    repDetector?.setEnabled(false);
+    _paceMonitor.stopMonitoring();
+
+    await _shutdownStep('game controller', () async {
+      await gameController?.dispose();
+    });
+    await _shutdownStep('pace monitor', _paceMonitor.dispose);
+    await _shutdownStep('rep detector', () async {
+      await repDetector?.dispose();
+    });
+    await _shutdownStep('pose detector', _poseDetectorService.dispose);
+    await _shutdownStep('camera', _cameraService.dispose);
+  }
+
+  Future<void> _shutdownStep(
+    String label,
+    Future<void> Function() dispose,
+  ) async {
+    try {
+      await dispose();
+    } catch (e) {
+      assert(() {
+        debugPrint('[GameScreen] Failed to dispose $label: $e');
+        return true;
+      }());
+    }
+  }
+
   @override
   void dispose() {
+    _isDisposed = true;
     WidgetsBinding.instance.removeObserver(this);
-    _gameController?.dispose();
-    _paceMonitor.dispose();
-    _repDetector?.dispose();
-    _cameraService.dispose();
-    _poseDetectorService.dispose();
+    unawaited(_shutdownRealtimePipeline());
     super.dispose();
   }
 

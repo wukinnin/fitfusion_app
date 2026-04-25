@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flame/components.dart';
+import 'package:flame/components.dart' hide Timer;
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
@@ -262,7 +262,22 @@ class FitFusionGame extends FlameGame {
 
   @override
   void onRemove() {
-    _phaseController.close();
+    for (final timer in _popupTimers) {
+      timer.cancel();
+    }
+    _popupTimers.clear();
+    _slashPool.clear();
+    _damageNumberPool.clear();
+    _hudComponents.clear();
+    _hudOriginalX.clear();
+    _repIntervals.clear();
+    _activePopupCount = 0;
+    _waitingForRoundWinDelay = false;
+    _paceTimerActive = false;
+
+    if (!_phaseController.isClosed) {
+      _phaseController.close();
+    }
     super.onRemove();
   }
 
@@ -485,6 +500,7 @@ class FitFusionGame extends FlameGame {
   // --- Achievement Popup ---
 
   int _activePopupCount = 0;
+  final List<Timer> _popupTimers = [];
 
   /// Spawns an achievement trophy popup below the pace timer.
   /// Each concurrent popup stacks downward via [stackIndex].
@@ -497,9 +513,12 @@ class FitFusionGame extends FlameGame {
     _playAudioSafe('sfx/achievement.mp3');
 
     // Decrement active count when popup finishes (total duration = 3.0s)
-    Future.delayed(const Duration(seconds: 3), () {
+    late final Timer popupTimer;
+    popupTimer = Timer(const Duration(seconds: 3), () {
+      _popupTimers.remove(popupTimer);
       _activePopupCount = (_activePopupCount - 1).clamp(0, 100);
     });
+    _popupTimers.add(popupTimer);
   }
 
   // --- Audio Helper ---

@@ -25,6 +25,8 @@ class PoseDetectorService {
   DateTime? _lastProcessStartedAt;
   Uint8List? _frameBuffer;
   MotionState _lastMotionState = MotionState.empty();
+  bool _isDisposed = false;
+  Future<void>? _disposeFuture;
 
   PoseDetectorService() {
     _detector = PoseDetector(
@@ -39,6 +41,7 @@ class PoseDetectorService {
   Stream<MotionState> get motionStateStream => _motionStateController.stream;
 
   void setEnabled(bool enabled) {
+    if (_isDisposed) return;
     if (_isEnabled == enabled) return;
     _isEnabled = enabled;
 
@@ -52,10 +55,15 @@ class PoseDetectorService {
     Stream<CameraImage> frameStream,
     CameraDescription camera,
   ) {
+    if (_isDisposed) return;
     _subscription = frameStream.listen((image) => _processFrame(image, camera));
   }
 
-  Future<void> _processFrame(CameraImage image, CameraDescription camera) async {
+  Future<void> _processFrame(
+    CameraImage image,
+    CameraDescription camera,
+  ) async {
+    if (_isDisposed) return;
     if (!_isEnabled) return;
     if (_isProcessing) return;
 
@@ -84,6 +92,7 @@ class PoseDetectorService {
       }
 
       final pose = poses.first;
+      if (_isDisposed) return;
 
       // Filter: check that critical landmarks are reliable
       if (!_areCriticalLandmarksReliable(pose)) {
@@ -109,6 +118,7 @@ class PoseDetectorService {
   }
 
   void _publishNoPose() {
+    if (_isDisposed) return;
     _poseController.add(null);
     _motionStateController.add(_lastMotionState.asStale(DateTime.now()));
   }
@@ -139,7 +149,7 @@ class PoseDetectorService {
 
     // Verify format is supported
     final format = InputImageFormatValue.fromRawValue(image.format.raw);
-    
+
     // On Android, we expect NV21 (17) or YUV_420_888 (35)
     if (!_hasWarnedUnexpectedFormat &&
         (format == null ||
@@ -159,8 +169,8 @@ class PoseDetectorService {
     // If we receive YUV_420_888, we lie and say it's NV21.
     // The byte structure (concatenated planes) is compatible enough for pose detection
     // (though chroma channels might be swapped, which doesn't affect the skeleton much).
-    final processingFormat = (format == InputImageFormat.yuv_420_888) 
-        ? InputImageFormat.nv21 
+    final processingFormat = (format == InputImageFormat.yuv_420_888)
+        ? InputImageFormat.nv21
         : (format ?? InputImageFormat.nv21);
 
     // Concatenate all plane bytes
@@ -169,12 +179,12 @@ class PoseDetectorService {
     for (final Plane plane in image.planes) {
       totalBytes += plane.bytes.length;
     }
-    
+
     // Reuse buffer if possible to avoid GC
     if (_frameBuffer == null || _frameBuffer!.length != totalBytes) {
       _frameBuffer = Uint8List(totalBytes);
     }
-    
+
     int offset = 0;
     for (final Plane plane in image.planes) {
       _frameBuffer!.setAll(offset, plane.bytes);
@@ -248,7 +258,8 @@ class PoseDetectorService {
     final ankleSpread = (leftAnkle != null && rightAnkle != null)
         ? _distance(leftAnkle, rightAnkle)
         : 0.0;
-    final isJumping = shoulderWidth > 0 &&
+    final isJumping =
+        shoulderWidth > 0 &&
         leftArmRaised &&
         rightArmRaised &&
         ankleSpread / shoulderWidth > 1.1;
@@ -260,7 +271,8 @@ class PoseDetectorService {
       leftKnee,
       rightKnee,
     );
-    final sideCrunch = shoulderWidth > 0 &&
+    final sideCrunch =
+        shoulderWidth > 0 &&
         (_isClose(leftElbow, leftKnee, shoulderWidth) ||
             _isClose(rightElbow, rightKnee, shoulderWidth));
 
@@ -298,11 +310,13 @@ class PoseDetectorService {
     PoseLandmark? leftKnee,
     PoseLandmark? rightKnee,
   ) {
-    final leftDelta = (leftKnee != null &&
+    final leftDelta =
+        (leftKnee != null &&
             leftKnee.likelihood >= kLandmarkLikelihoodThreshold)
         ? leftKnee.y - leftHip.y
         : null;
-    final rightDelta = (rightKnee != null &&
+    final rightDelta =
+        (rightKnee != null &&
             rightKnee.likelihood >= kLandmarkLikelihoodThreshold)
         ? rightKnee.y - rightHip.y
         : null;
@@ -337,9 +351,20 @@ class PoseDetectorService {
   }
 
   Future<void> dispose() async {
+    _disposeFuture ??= _disposeInternal();
+    await _disposeFuture;
+  }
+
+  Future<void> _disposeInternal() async {
+    _isDisposed = true;
+    _isEnabled = false;
     await _subscription?.cancel();
     await _detector.close();
-    await _poseController.close();
-    await _motionStateController.close();
+    if (!_poseController.isClosed) {
+      await _poseController.close();
+    }
+    if (!_motionStateController.isClosed) {
+      await _motionStateController.close();
+    }
   }
 }

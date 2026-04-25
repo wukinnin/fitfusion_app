@@ -68,7 +68,10 @@ class _StatsScreenState extends State<StatsScreen>
       // Fetch all user sessions
       final sessions = await _client
           .from('sessions')
-          .select()
+          .select(
+            'workout_type, won, total_time_seconds, best_rep_interval_seconds, '
+            'avg_rep_interval_seconds, rounds_completed, total_reps',
+          )
           .eq('user_id', user.id);
 
       // Build per-workout stats
@@ -160,7 +163,7 @@ class _StatsScreenState extends State<StatsScreen>
       // Overall lifetime stats from view
       final lifetime = await _client
           .from('v_user_lifetime_stats')
-          .select()
+          .select('total_sessions, total_reps, total_rounds, total_victories')
           .eq('user_id', user.id)
           .maybeSingle();
 

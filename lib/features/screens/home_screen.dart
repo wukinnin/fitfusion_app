@@ -26,6 +26,8 @@ class HomeScreen extends StatelessWidget {
                         Image.asset(
                           'assets/images/game/logo.png',
                           height: 140,
+                          cacheWidth: 420,
+                          cacheHeight: 420,
                           fit: BoxFit.contain,
                         ),
                         const SizedBox(height: 24),
