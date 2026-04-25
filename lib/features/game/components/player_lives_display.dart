@@ -12,8 +12,22 @@ class PlayerLivesDisplay extends PositionComponent with HasGameReference<FitFusi
 
   final Paint _activePaint = Paint()..color = const Color(0xFF1A3A8A);
   final Paint _lostPaint = Paint()..color = const Color(0xFF1A1A2E);
+  final Paint _outlinePaint = Paint()
+    ..color = const Color(0xFFFFD700)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.0;
+  late final List<Path> _heartPaths;
+
+  PlayerLivesDisplay() {
+    _heartPaths = List.generate(kStartingLives, (i) {
+      final cx = i * (heartSize + heartSpacing) + heartSize / 2;
+      final cy = heartSize / 2;
+      return _buildHeartPath(cx, cy, heartSize * 0.45);
+    });
+  }
 
   void setLives(int lives) {
+    if (_lives == lives) return;
     _lives = lives;
   }
 
@@ -25,26 +39,19 @@ class PlayerLivesDisplay extends PositionComponent with HasGameReference<FitFusi
     for (int i = 0; i < kStartingLives; i++) {
       final isActive = i < _lives;
       final paint = isActive ? _activePaint : _lostPaint;
-      final cx = i * (heartSize + heartSpacing) + heartSize / 2;
-      final cy = heartSize / 2;
-
-      _drawHeart(canvas, cx, cy, heartSize * 0.45, paint);
+      final path = _heartPaths[i];
+      canvas.drawPath(path, paint);
+      canvas.drawPath(path, _outlinePaint);
     }
   }
 
-  void _drawHeart(Canvas canvas, double cx, double cy, double radius, Paint paint) {
+  Path _buildHeartPath(double cx, double cy, double radius) {
     final path = Path();
     final r = radius;
     path.moveTo(cx, cy + r * 0.5);
     path.cubicTo(cx - r * 1.2, cy - r * 0.3, cx - r * 0.6, cy - r * 1.2, cx, cy - r * 0.5);
     path.cubicTo(cx + r * 0.6, cy - r * 1.2, cx + r * 1.2, cy - r * 0.3, cx, cy + r * 0.5);
     path.close();
-    canvas.drawPath(path, paint);
-
-    final outlinePaint = Paint()
-      ..color = const Color(0xFFFFD700)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    canvas.drawPath(path, outlinePaint);
+    return path;
   }
 }

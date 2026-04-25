@@ -10,6 +10,7 @@ int repsRequiredForRound(int round) => round + 1;
 
 // Camera / ML Kit Performance
 const int kFrameSkipCount = 2; // process every Nth frame from the camera
+const int kPoseDetectionTargetFps = 12;
 const double kLandmarkLikelihoodThreshold = 0.5;
 
 // Rep Detection Thresholds

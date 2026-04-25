@@ -22,6 +22,28 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
 
   final int stackIndex;
   double _elapsed = 0;
+  final Paint _backgroundPaint = Paint()..color = const Color(0xCC1A1A2E);
+  final Paint _borderPaint = Paint()
+    ..color = const Color(0xFFFFD700)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.5;
+  final Paint _trophyPaint = Paint()
+    ..color = const Color(0xFFFFD700)
+    ..style = PaintingStyle.fill;
+  final Paint _strokePaint = Paint()
+    ..color = const Color(0xFFFFD700)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.0
+    ..strokeCap = StrokeCap.round;
+  final Paint _handlePaint = Paint()
+    ..color = const Color(0xFFFFD700)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.8;
+  final Paint _starPaint = Paint()
+    ..color = const Color(0xFF1A1A2E)
+    ..style = PaintingStyle.fill;
+  final Path _cupPath = Path();
+  final Path _starPath = Path();
 
   AchievementPopup({required this.stackIndex});
 
@@ -63,7 +85,8 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
       x = _restX + (_offScreenX - _restX) * eased;
     }
 
-    position = Vector2(x, _baseY);
+    position.x = x;
+    position.y = _baseY;
   }
 
   @override
@@ -74,17 +97,14 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
     canvas.drawCircle(
       center,
       popupRadius,
-      Paint()..color = const Color(0xCC1A1A2E),
+      _backgroundPaint,
     );
 
     // Gold border
     canvas.drawCircle(
       center,
       popupRadius,
-      Paint()
-        ..color = const Color(0xFFFFD700)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5,
+      _borderPaint,
     );
 
     // Trophy icon — drawn as a simple geometric shape
@@ -92,33 +112,17 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
   }
 
   void _drawTrophy(Canvas canvas, Offset center, double size) {
-    final paint = Paint()
-      ..color = const Color(0xFFFFD700)
-      ..style = PaintingStyle.fill;
-
-    final strokePaint = Paint()
-      ..color = const Color(0xFFFFD700)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round;
-
     final cx = center.dx;
     final cy = center.dy;
 
     // Cup body (trapezoid shape)
-    final cupPath = Path();
-    cupPath.moveTo(cx - size * 0.6, cy - size * 0.5);
-    cupPath.lineTo(cx + size * 0.6, cy - size * 0.5);
-    cupPath.lineTo(cx + size * 0.35, cy + size * 0.15);
-    cupPath.lineTo(cx - size * 0.35, cy + size * 0.15);
-    cupPath.close();
-    canvas.drawPath(cupPath, paint);
-
-    // Cup handles (small arcs on each side)
-    final handlePaint = Paint()
-      ..color = const Color(0xFFFFD700)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
+    _cupPath.reset();
+    _cupPath.moveTo(cx - size * 0.6, cy - size * 0.5);
+    _cupPath.lineTo(cx + size * 0.6, cy - size * 0.5);
+    _cupPath.lineTo(cx + size * 0.35, cy + size * 0.15);
+    _cupPath.lineTo(cx - size * 0.35, cy + size * 0.15);
+    _cupPath.close();
+    canvas.drawPath(_cupPath, _trophyPaint);
 
     // Left handle
     canvas.drawArc(
@@ -130,7 +134,7 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
       -math.pi * 0.3,
       math.pi * 0.8,
       false,
-      handlePaint,
+      _handlePaint,
     );
 
     // Right handle
@@ -143,21 +147,21 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
       math.pi * 0.5,
       math.pi * 0.8,
       false,
-      handlePaint,
+      _handlePaint,
     );
 
     // Stem
     canvas.drawLine(
       Offset(cx, cy + size * 0.15),
       Offset(cx, cy + size * 0.5),
-      strokePaint,
+      _strokePaint,
     );
 
     // Base
     canvas.drawLine(
       Offset(cx - size * 0.35, cy + size * 0.5),
       Offset(cx + size * 0.35, cy + size * 0.5),
-      strokePaint,
+      _strokePaint,
     );
 
     // Star in center of cup
@@ -165,11 +169,7 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
   }
 
   void _drawStar(Canvas canvas, Offset center, double radius) {
-    final paint = Paint()
-      ..color = const Color(0xFF1A1A2E)
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
+    _starPath.reset();
     const int points = 5;
     final innerRadius = radius * 0.4;
 
@@ -179,13 +179,13 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
       final x = center.dx + r * math.cos(angle);
       final y = center.dy + r * math.sin(angle);
       if (i == 0) {
-        path.moveTo(x, y);
+        _starPath.moveTo(x, y);
       } else {
-        path.lineTo(x, y);
+        _starPath.lineTo(x, y);
       }
     }
-    path.close();
-    canvas.drawPath(path, paint);
+    _starPath.close();
+    canvas.drawPath(_starPath, _starPaint);
   }
 
   double _easeOutCubic(double t) => 1 - math.pow(1 - t, 3).toDouble();

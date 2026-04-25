@@ -9,6 +9,9 @@ class DamageFlashOverlay extends PositionComponent with HasGameReference<FitFusi
 
   double _elapsed = 0;
   bool _isActive = false;
+  final Paint _paint = Paint();
+  Rect _screenRect = Rect.zero;
+  Vector2 _lastSize = Vector2.zero();
 
   void trigger() {
     _isActive = true;
@@ -33,10 +36,12 @@ class DamageFlashOverlay extends PositionComponent with HasGameReference<FitFusi
 
     final progress = (_elapsed / _flashDuration).clamp(0.0, 1.0);
     final alpha = _maxOpacity * (1.0 - progress);
+    if (_lastSize != game.size) {
+      _lastSize = game.size.clone();
+      _screenRect = Rect.fromLTWH(0, 0, game.size.x, game.size.y);
+    }
+    _paint.color = Color.fromRGBO(183, 28, 28, alpha);
 
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, game.size.x, game.size.y),
-      Paint()..color = Color.fromRGBO(183, 28, 28, alpha),
-    );
+    canvas.drawRect(_screenRect, _paint);
   }
 }

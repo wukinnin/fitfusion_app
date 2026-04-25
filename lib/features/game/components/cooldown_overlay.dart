@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -8,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants.dart';
 import '../../../core/enums.dart';
-import '../../../services/app_bgm_service.dart';
 import '../fitfusion_game.dart';
 
 enum _CooldownPhase { slideIn, countdown, slideOut }
@@ -19,13 +17,42 @@ class CooldownOverlay extends PositionComponent
   static const double slideOutDuration = 1.0;
 
   final Map<WorkoutType, ui.Image> _exerciseImages = {};
+  final Paint _tintPaint = Paint()..color = const Color(0x66000000);
+  final Paint _arcPaint = Paint()
+    ..color = const Color(0xFFFFD700)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 6;
+  final Paint _circlePaint = Paint()
+    ..color = const Color(0xFFFFD700)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3;
+  final Paint _imagePaint = Paint();
+  final TextPainter _roundPainter = TextPainter(
+    textDirection: TextDirection.ltr,
+  );
+  final TextStyle _roundStyle = GoogleFonts.cinzel(
+    color: const Color(0xFFFFFDE7),
+    fontSize: 48,
+    fontWeight: FontWeight.bold,
+    shadows: const [
+      Shadow(blurRadius: 8, color: Colors.black),
+      Shadow(blurRadius: 4, color: Colors.black),
+    ],
+  );
+  final TextStyle _countStyle = GoogleFonts.cinzel(
+    color: const Color(0xFFFFFDE7),
+    fontSize: 80,
+    fontWeight: FontWeight.bold,
+    shadows: const [Shadow(blurRadius: 4, color: Colors.black)],
+  );
+  late final List<TextPainter> _countdownPainters;
 
   _CooldownPhase _phase = _CooldownPhase.slideIn;
   double _phaseTimer = 0;
   double _countdownRemaining = kCooldownSeconds.toDouble();
-  int? _previousCountdownSecond;
   int _nextRound = 1;
   bool _isActive = false;
+  bool _roundTextDirty = true;
 
   VoidCallback? onCooldownComplete;
 
@@ -47,16 +74,15 @@ class CooldownOverlay extends PositionComponent
 
   void startCooldown(int nextRound) {
     _nextRound = nextRound;
+    _roundTextDirty = true;
     _phase = _CooldownPhase.slideIn;
     _phaseTimer = 0;
     _countdownRemaining = kCooldownSeconds.toDouble();
-    _previousCountdownSecond = kCooldownSeconds;
     _isActive = true;
   }
 
   void stopCooldown() {
     _isActive = false;
-    _previousCountdownSecond = null;
   }
 
   bool get isActive => _isActive;
@@ -74,6 +100,13 @@ class CooldownOverlay extends PositionComponent
     _exerciseImages[WorkoutType.obliqueCrunches] = await game.images.load(
       'game/side-crunches.png',
     );
+
+    _countdownPainters = List.generate(kCooldownSeconds + 1, (seconds) {
+      return TextPainter(
+        text: TextSpan(text: '$seconds', style: _countStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+    });
   }
 
   @override
@@ -88,31 +121,11 @@ class CooldownOverlay extends PositionComponent
         if (_phaseTimer >= slideInDuration) {
           _phase = _CooldownPhase.countdown;
           _phaseTimer = 0;
-          _previousCountdownSecond = _countdownRemaining.ceil();
         }
         break;
 
       case _CooldownPhase.countdown:
-        final previousSecond =
-            _previousCountdownSecond ?? _countdownRemaining.ceil();
         _countdownRemaining -= dt;
-        final currentSecond = _countdownRemaining <= 0
-            ? 0
-            : _countdownRemaining.ceil();
-
-        if (currentSecond < previousSecond) {
-          for (
-            var crossedSecond = previousSecond - 1;
-            crossedSecond >= currentSecond;
-            crossedSecond--
-          ) {
-            if (crossedSecond >= 0 && crossedSecond < kCooldownSeconds) {
-              _playTickSafe();
-            }
-          }
-        }
-
-        _previousCountdownSecond = currentSecond;
 
         if (_countdownRemaining <= 0) {
           _countdownRemaining = 0;
@@ -161,31 +174,20 @@ class CooldownOverlay extends PositionComponent
     canvas.translate(slideOffsetX, 0);
 
     // 40% black tint overlay
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, screenW, screenH),
-      Paint()..color = const Color(0x66000000),
-    );
+    canvas.drawRect(Rect.fromLTWH(0, 0, screenW, screenH), _tintPaint);
 
     // "ROUND X" header — top area
-    final roundText = TextSpan(
-      text: 'ROUND $_nextRound',
-      style: GoogleFonts.cinzel(
-        color: const Color(0xFFFFFDE7),
-        fontSize: 48,
-        fontWeight: FontWeight.bold,
-        shadows: const [
-          Shadow(blurRadius: 8, color: Colors.black),
-          Shadow(blurRadius: 4, color: Colors.black),
-        ],
-      ),
-    );
-    final roundTp = TextPainter(
-      text: roundText,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    roundTp.paint(
+    if (_roundTextDirty) {
+      _roundPainter.text = TextSpan(
+        text: 'ROUND $_nextRound',
+        style: _roundStyle,
+      );
+      _roundPainter.layout();
+      _roundTextDirty = false;
+    }
+    _roundPainter.paint(
       canvas,
-      Offset((screenW - roundTp.width) / 2, screenH * 0.12),
+      Offset((screenW - _roundPainter.width) / 2, screenH * 0.12),
     );
 
     // Countdown circle — center area
@@ -197,10 +199,6 @@ class CooldownOverlay extends PositionComponent
     final fraction = _countdownRemaining / kCooldownSeconds;
 
     // Pie-chart countdown
-    final arcPaint = Paint()
-      ..color = const Color(0xFFFFD700)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6;
     final arcRect = Rect.fromCircle(
       center: Offset(centerX, centerY),
       radius: circleRadius,
@@ -210,34 +208,20 @@ class CooldownOverlay extends PositionComponent
       -math.pi / 2,
       fraction * 2 * math.pi,
       false,
-      arcPaint,
+      _arcPaint,
     );
 
     // Circle border
     canvas.drawCircle(
       Offset(centerX, centerY),
       circleRadius,
-      Paint()
-        ..color = const Color(0xFFFFD700)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
+      _circlePaint,
     );
 
     // Countdown number
     final seconds = _countdownRemaining.ceil();
-    final countText = TextSpan(
-      text: '$seconds',
-      style: GoogleFonts.cinzel(
-        color: const Color(0xFFFFFDE7),
-        fontSize: 80,
-        fontWeight: FontWeight.bold,
-        shadows: const [Shadow(blurRadius: 4, color: Colors.black)],
-      ),
-    );
-    final countTp = TextPainter(
-      text: countText,
-      textDirection: TextDirection.ltr,
-    )..layout();
+    final countTp =
+        _countdownPainters[seconds.clamp(0, kCooldownSeconds).toInt()];
     countTp.paint(
       canvas,
       Offset(centerX - countTp.width / 2, centerY - countTp.height / 2),
@@ -276,7 +260,7 @@ class CooldownOverlay extends PositionComponent
         image.height.toDouble(),
       );
 
-      canvas.drawImageRect(image, srcRect, dstRect, Paint());
+      canvas.drawImageRect(image, srcRect, dstRect, _imagePaint);
     }
 
     canvas.restore();
@@ -284,12 +268,4 @@ class CooldownOverlay extends PositionComponent
 
   double _easeOutCubic(double t) => 1 - math.pow(1 - t, 3).toDouble();
   double _easeInCubic(double t) => t * t * t;
-
-  void _playTickSafe() {
-    try {
-      unawaited(AppBgmService.instance.playSfx('sfx/tick1.mp3'));
-    } catch (e) {
-      debugPrint('[CooldownOverlay] Audio error: $e');
-    }
-  }
 }

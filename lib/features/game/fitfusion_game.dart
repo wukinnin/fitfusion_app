@@ -64,7 +64,6 @@ class FitFusionGame extends FlameGame {
   // Pace timer tracking
   double _paceTimeRemaining = kPaceThresholdSeconds;
   bool _paceTimerActive = false;
-  int? _previousPaceSecond;
 
   // Post-round-win delay — let hit effects play before cooldown
   static const double _roundWinDelay = 1;
@@ -81,6 +80,8 @@ class FitFusionGame extends FlameGame {
   late final RoundBanner _roundBanner;
   late final CooldownOverlay _cooldownOverlay;
   late final DamageFlashOverlay _damageFlash;
+  final List<SwordSlashComponent> _slashPool = [];
+  final List<DamageNumber> _damageNumberPool = [];
 
   // HUD components — slide in/out with cooldown
   final List<PositionComponent> _hudComponents = [];
@@ -97,6 +98,12 @@ class FitFusionGame extends FlameGame {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    await images.loadAll([
+      ...MonsterComponent.monsterFiles,
+      'game/squats.png',
+      'game/jumping-jacks.png',
+      'game/side-crunches.png',
+    ]);
 
     // === TOP HUD LAYOUT ===
     // Row 1: Health bar — full width, near top
@@ -136,6 +143,16 @@ class FitFusionGame extends FlameGame {
     _cooldownOverlay = CooldownOverlay()
       ..onCooldownComplete = _onCooldownComplete;
     add(_cooldownOverlay);
+
+    for (var i = 0; i < 6; i++) {
+      final slash = SwordSlashComponent();
+      _slashPool.add(slash);
+      add(slash);
+
+      final damageNumber = DamageNumber();
+      _damageNumberPool.add(damageNumber);
+      add(damageNumber);
+    }
 
     // Track all HUD components for slide animation during cooldown
     _hudComponents.addAll([
@@ -178,7 +195,6 @@ class FitFusionGame extends FlameGame {
 
     _paceTimeRemaining = kPaceThresholdSeconds;
     _paceTimerActive = false;
-    _previousPaceSecond = null;
 
     // Update all components
     _updateHUD();
@@ -228,26 +244,7 @@ class FitFusionGame extends FlameGame {
 
     // Pace timer countdown during playing phase
     if (_phase == GamePhase.playing && _paceTimerActive) {
-      final previousSecond = _previousPaceSecond ?? _paceTimeRemaining.ceil();
       _paceTimeRemaining -= dt;
-      final currentSecond = _paceTimeRemaining <= 0
-          ? 0
-          : _paceTimeRemaining.ceil();
-
-      if (currentSecond < previousSecond) {
-        for (
-          var crossedSecond = previousSecond - 1;
-          crossedSecond >= currentSecond;
-          crossedSecond--
-        ) {
-          if (crossedSecond > 0 &&
-              crossedSecond < kPaceThresholdSeconds.ceil()) {
-            _playAudioSafe('sfx/tick2.mp3');
-          }
-        }
-      }
-
-      _previousPaceSecond = currentSecond;
       _paceIndicator.setRemaining(_paceTimeRemaining);
     }
 
@@ -265,7 +262,6 @@ class FitFusionGame extends FlameGame {
 
   @override
   void onRemove() {
-    AppBgmService.instance.stopGameplayBgm();
     _phaseController.close();
     super.onRemove();
   }
@@ -289,11 +285,9 @@ class FitFusionGame extends FlameGame {
     if (_sessionEnded) return;
     if (_phase == GamePhase.victory || _phase == GamePhase.defeat) return;
 
-    AppBgmService.instance.stopGameplayBgm();
     _playerLives = 0;
     _livesDisplay.setLives(0);
     _cooldownOverlay.stopCooldown();
-    _previousPaceSecond = null;
     _handleDefeat();
   }
 
@@ -303,9 +297,7 @@ class FitFusionGame extends FlameGame {
     _phase = GamePhase.cooldown;
     _phaseController.add(_phase);
 
-    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
-    _previousPaceSecond = null;
     _paceIndicator.setActive(false);
 
     _cooldownOverlay.startCooldown(_currentRound);
@@ -319,12 +311,10 @@ class FitFusionGame extends FlameGame {
     _phase = GamePhase.playing;
     _phaseController.add(_phase);
 
-    // Pace timer starts immediately after cooldown
+    // Pace timer starts immediately after cooldown.
     _paceTimeRemaining = kPaceThresholdSeconds;
     _paceTimerActive = true;
-    _previousPaceSecond = kPaceThresholdSeconds.ceil();
     _paceIndicator.setActive(true);
-    AppBgmService.instance.startGameplayBgm();
   }
 
   // --- Internal Game Logic ---
@@ -342,9 +332,8 @@ class FitFusionGame extends FlameGame {
     _lastRepTime = now;
     _lastRepRound = _currentRound;
 
-    // Reset pace timer
+    // Reset pace timer.
     _paceTimeRemaining = kPaceThresholdSeconds;
-    _previousPaceSecond = kPaceThresholdSeconds.ceil();
     _paceIndicator.setRemaining(_paceTimeRemaining);
 
     // Update visuals
@@ -366,8 +355,11 @@ class FitFusionGame extends FlameGame {
   }
 
   void _spawnHitEffects() {
-    // Slash at monster position
-    final slashPos = Vector2(
+    final slash = _slashPool.firstWhere(
+      (effect) => !effect.isEffectActive,
+      orElse: () => _slashPool.first,
+    );
+    slash.activateAt(
       _monster.position.x +
           MonsterComponent.displayWidth / 2 -
           SwordSlashComponent.slashWidth / 2,
@@ -375,14 +367,15 @@ class FitFusionGame extends FlameGame {
           MonsterComponent.displayHeight / 2 -
           SwordSlashComponent.slashHeight / 2,
     );
-    add(SwordSlashComponent(startPosition: slashPos));
 
-    // Damage number floating up from monster
-    final dmgPos = Vector2(
+    final damageNumber = _damageNumberPool.firstWhere(
+      (effect) => !effect.isEffectActive,
+      orElse: () => _damageNumberPool.first,
+    );
+    damageNumber.activateAt(
       _monster.position.x + MonsterComponent.displayWidth / 2,
       _monster.position.y + 10,
     );
-    add(DamageNumber(startPosition: dmgPos));
   }
 
   void _handlePaceFailure() {
@@ -395,7 +388,6 @@ class FitFusionGame extends FlameGame {
 
     // Reset pace timer after failure
     _paceTimeRemaining = kPaceThresholdSeconds;
-    _previousPaceSecond = kPaceThresholdSeconds.ceil();
     _paceIndicator.setRemaining(_paceTimeRemaining);
 
     if (_playerLives <= 0) {
@@ -405,9 +397,7 @@ class FitFusionGame extends FlameGame {
 
   void _handleRoundWon() {
     _roundsCompleted++;
-    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
-    _previousPaceSecond = null;
     _paceIndicator.setActive(false);
 
     // Freeze pace timer display at 5
@@ -442,9 +432,7 @@ class FitFusionGame extends FlameGame {
   }
 
   void _handleDefeat() {
-    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
-    _previousPaceSecond = null;
     _paceIndicator.setActive(false);
     _phase = GamePhase.defeat;
     _phaseController.add(_phase);
@@ -455,9 +443,7 @@ class FitFusionGame extends FlameGame {
     if (_sessionEnded) return;
     _sessionEnded = true;
 
-    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
-    _previousPaceSecond = null;
     _cooldownOverlay.stopCooldown();
 
     final endTime = DateTime.now();
@@ -519,10 +505,13 @@ class FitFusionGame extends FlameGame {
   // --- Audio Helper ---
 
   void _playAudioSafe(String file) {
-    try {
-      AppBgmService.instance.playSfx(file);
-    } catch (e) {
-      debugPrint('[FitFusionGame] Audio error: $e');
-    }
+    unawaited(
+      AppBgmService.instance.playSfx(file).catchError((Object e) {
+        assert(() {
+          debugPrint('[FitFusionGame] Audio error: $e');
+          return true;
+        }());
+      }),
+    );
   }
 }

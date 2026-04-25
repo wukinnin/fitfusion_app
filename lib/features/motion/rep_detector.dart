@@ -51,6 +51,7 @@ class RepDetector {
       StreamController<RepEvent>.broadcast();
 
   Stream<RepEvent> get repStream => _repController.stream;
+  bool _isEnabled = false;
 
   _SquatState _squatState = _SquatState.standing;
   double? _squatStandingBaseline;
@@ -107,6 +108,7 @@ class RepDetector {
   }
 
   void _onPose(Pose? pose) {
+    if (!_isEnabled) return;
     if (pose == null) return;
 
     switch (workoutType) {
@@ -128,10 +130,19 @@ class RepDetector {
   }
 
   void _emitRep() {
-    debugPrint('[RepDetector] REP DETECTED — $workoutType');
+    assert(() {
+      debugPrint('[RepDetector] REP DETECTED — $workoutType');
+      return true;
+    }());
     _repController.add(
       RepEvent(workoutType: workoutType, timestamp: DateTime.now()),
     );
+  }
+
+  void setEnabled(bool enabled) {
+    if (_isEnabled == enabled) return;
+    _isEnabled = enabled;
+    reset();
   }
 
   void reset() {
@@ -150,7 +161,10 @@ class RepDetector {
     _crunchLeftElbowEarBuffer.clear();
     _crunchRightElbowEarBuffer.clear();
     _lastValidShoulderWidth = null;
-    debugPrint('[RepDetector] State reset');
+    assert(() {
+      debugPrint('[RepDetector] State reset');
+      return true;
+    }());
   }
 
   // --- Squat Logic ---
@@ -178,12 +192,15 @@ class RepDetector {
         // Count once the player reaches at least a half squat (parallel-ish) or deeper.
         if (depthRatio < kSquatDownThreshold) {
           _squatState = _SquatState.squatDown;
-          debugPrint(
-            '[RepDetector] Squat DOWN detected '
-            '(ratio: ${depthRatio.toStringAsFixed(3)}, '
-            'metric: ${smoothed.toStringAsFixed(3)}, '
-            'baseline: ${baseline.toStringAsFixed(3)})',
-          );
+          assert(() {
+            debugPrint(
+              '[RepDetector] Squat DOWN detected '
+              '(ratio: ${depthRatio.toStringAsFixed(3)}, '
+              'metric: ${smoothed.toStringAsFixed(3)}, '
+              'baseline: ${baseline.toStringAsFixed(3)})',
+            );
+            return true;
+          }());
         }
         break;
 
@@ -191,12 +208,15 @@ class RepDetector {
         // Hip rises back up — require a clear return toward the standing baseline.
         if (depthRatio > kSquatUpThreshold) {
           _squatState = _SquatState.standing;
-          debugPrint(
-            '[RepDetector] Squat UP detected '
-            '(ratio: ${depthRatio.toStringAsFixed(3)}, '
-            'metric: ${smoothed.toStringAsFixed(3)}, '
-            'baseline: ${baseline.toStringAsFixed(3)})',
-          );
+          assert(() {
+            debugPrint(
+              '[RepDetector] Squat UP detected '
+              '(ratio: ${depthRatio.toStringAsFixed(3)}, '
+              'metric: ${smoothed.toStringAsFixed(3)}, '
+              'baseline: ${baseline.toStringAsFixed(3)})',
+            );
+            return true;
+          }());
           _emitRep();
         }
         break;
@@ -299,9 +319,12 @@ class RepDetector {
 
     // Debug print
     if (leftSmoothed > 0.05 || rightSmoothed > 0.05) {
-      debugPrint(
-        '[JJ Debug] L:${leftSmoothed.toStringAsFixed(3)} R:${rightSmoothed.toStringAsFixed(3)} Spread:${spreadSmoothed.toStringAsFixed(2)} Sym:${symmetrySmoothed.toStringAsFixed(2)} State:$_jackState',
-      );
+      assert(() {
+        debugPrint(
+          '[JJ Debug] L:${leftSmoothed.toStringAsFixed(3)} R:${rightSmoothed.toStringAsFixed(3)} Spread:${spreadSmoothed.toStringAsFixed(2)} Sym:${symmetrySmoothed.toStringAsFixed(2)} State:$_jackState',
+        );
+        return true;
+      }());
     }
 
     switch (_jackState) {
@@ -314,7 +337,10 @@ class RepDetector {
             rightSmoothed > kJumpingJackWristRaiseThreshold &&
             symmetrySmoothed > kJumpingJackPerLegThreshold) {
           _jackState = _JumpingJackState.armsUp;
-          debugPrint('[RepDetector] Jumping Jack UP detected (Symmetrical)');
+          assert(() {
+            debugPrint('[RepDetector] Jumping Jack UP detected (Symmetrical)');
+            return true;
+          }());
         }
         break;
 
@@ -468,11 +494,14 @@ class RepDetector {
         rightElbowEarSmoothed <= kCrunchElbowEarOnHeadThreshold;
 
     if (!hasHandsOnHeadForm) {
-      debugPrint(
-        '[Crunch Form] Invalid hands-on-head form '
-        '(leftElbowEar: ${leftElbowEarSmoothed.toStringAsFixed(3)}, '
-        'rightElbowEar: ${rightElbowEarSmoothed.toStringAsFixed(3)})',
-      );
+      assert(() {
+        debugPrint(
+          '[Crunch Form] Invalid hands-on-head form '
+          '(leftElbowEar: ${leftElbowEarSmoothed.toStringAsFixed(3)}, '
+          'rightElbowEar: ${rightElbowEarSmoothed.toStringAsFixed(3)})',
+        );
+        return true;
+      }());
       _invalidateObliqueCrunchTracking();
       return;
     }
@@ -542,10 +571,13 @@ class RepDetector {
         // Elbow and knee converge — crunch phase begins.
         if (elbowKneeSmoothed < kCrunchElbowKneeCrunchThreshold) {
           stateSetter(_CrunchSideState.crunching);
-          debugPrint(
-            '[Crunch $side] CRUNCHING '
-            '(elbowKnee: ${elbowKneeSmoothed.toStringAsFixed(3)})',
-          );
+          assert(() {
+            debugPrint(
+              '[Crunch $side] CRUNCHING '
+              '(elbowKnee: ${elbowKneeSmoothed.toStringAsFixed(3)})',
+            );
+            return true;
+          }());
         }
         break;
 
@@ -556,10 +588,13 @@ class RepDetector {
         if (elbowKneeSmoothed > kCrunchElbowKneeExtendedThreshold) {
           stateSetter(_CrunchSideState.extended);
           _emitRep();
-          debugPrint(
-            '[Crunch $side] REP COMPLETE '
-            '(elbowKnee: ${elbowKneeSmoothed.toStringAsFixed(3)})',
-          );
+          assert(() {
+            debugPrint(
+              '[Crunch $side] REP COMPLETE '
+              '(elbowKnee: ${elbowKneeSmoothed.toStringAsFixed(3)})',
+            );
+            return true;
+          }());
         }
         break;
     }

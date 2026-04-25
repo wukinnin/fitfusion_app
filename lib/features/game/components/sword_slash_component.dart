@@ -9,52 +9,64 @@ class SwordSlashComponent extends PositionComponent with HasGameReference<FitFus
   static const double slashHeight = 80;
 
   double _elapsed = 0;
+  bool _isActive = false;
+  bool get isEffectActive => _isActive;
 
-  SwordSlashComponent({required Vector2 startPosition}) {
-    position = startPosition;
+  final Path _path = Path();
+  final Paint _slashPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 4
+    ..strokeCap = StrokeCap.round;
+  final Paint _glowPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 10
+    ..strokeCap = StrokeCap.round;
+
+  SwordSlashComponent() {
     size = Vector2(slashWidth, slashHeight);
+  }
+
+  void activateAt(double x, double y) {
+    position.x = x;
+    position.y = y;
+    _elapsed = 0;
+    _isActive = true;
   }
 
   @override
   void update(double dt) {
     super.update(dt);
+    if (!_isActive) return;
+
     _elapsed += dt;
     if (_elapsed >= _lifetime) {
-      removeFromParent();
+      _isActive = false;
     }
   }
 
   @override
   void render(Canvas canvas) {
+    if (!_isActive) return;
+
     final progress = (_elapsed / _lifetime).clamp(0.0, 1.0);
     final alpha = (1.0 - progress).clamp(0.0, 1.0);
 
-    final paint = Paint()
-      ..color = Color.fromRGBO(255, 238, 88, alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round;
+    _slashPaint.color = Color.fromRGBO(255, 238, 88, alpha);
+    _glowPaint.color = Color.fromRGBO(255, 215, 0, alpha * 0.25);
 
-    final path = Path();
+    _path.reset();
     final cx = slashWidth / 2;
     final cy = slashHeight / 2;
     final extent = slashWidth * 0.4 * (0.3 + progress * 0.7);
 
     // Diagonal slash lines creating an X-like slash effect
-    path.moveTo(cx - extent, cy - extent * 0.6);
-    path.quadraticBezierTo(cx, cy, cx + extent, cy + extent * 0.6);
+    _path.moveTo(cx - extent, cy - extent * 0.6);
+    _path.quadraticBezierTo(cx, cy, cx + extent, cy + extent * 0.6);
 
-    path.moveTo(cx - extent * 0.8, cy + extent * 0.4);
-    path.quadraticBezierTo(cx, cy, cx + extent * 0.8, cy - extent * 0.4);
+    _path.moveTo(cx - extent * 0.8, cy + extent * 0.4);
+    _path.quadraticBezierTo(cx, cy, cx + extent * 0.8, cy - extent * 0.4);
 
-    canvas.drawPath(path, paint);
-
-    // Glow effect
-    final glowPaint = Paint()
-      ..color = Color.fromRGBO(255, 215, 0, alpha * 0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-    canvas.drawPath(path, glowPaint);
+    canvas.drawPath(_path, _glowPaint);
+    canvas.drawPath(_path, _slashPaint);
   }
 }

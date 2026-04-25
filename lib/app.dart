@@ -40,13 +40,17 @@ class _FitFusionAppState extends State<FitFusionApp> {
   @override
   void initState() {
     super.initState();
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      final session = data.session;
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
       final event = data.event;
 
-      if (event == AuthChangeEvent.signedOut || (event == AuthChangeEvent.userDeleted)) {
+      if (event == AuthChangeEvent.signedOut) {
         // Force redirect to auth landing if session is lost
-        _navigatorKey.currentState?.pushNamedAndRemoveUntil('/auth', (route) => false);
+        _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          '/auth',
+          (route) => false,
+        );
       }
     });
   }

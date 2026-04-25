@@ -6,7 +6,6 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/enums.dart';
 import '../../core/theme.dart';
-import '../../services/app_bgm_service.dart';
 import '../../services/session_service.dart';
 import '../../widgets/camera_preview_widget.dart';
 import '../../widgets/pose_overlay_painter.dart';
@@ -117,6 +116,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _gameController = GameController(
           game: _game!,
           repDetector: _repDetector!,
+          poseDetectorService: _poseDetectorService,
           paceMonitor: _paceMonitor,
           achievementService: _achievementService,
         );
@@ -213,7 +213,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _navigateToResults(GameSession session) {
     if (!mounted) return;
-    AppBgmService.instance.stopGameplayBgm();
     Navigator.pushReplacementNamed(context, '/results', arguments: session);
   }
 
@@ -225,7 +224,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    AppBgmService.instance.stopGameplayBgm();
     _gameController?.dispose();
     _paceMonitor.dispose();
     _repDetector?.dispose();

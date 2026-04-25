@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/enums.dart';
+import '../../core/events.dart';
 import '../achievements/achievement_service.dart';
 import '../motion/pace_monitor.dart';
+import '../motion/pose_detector_service.dart';
 import '../motion/rep_detector.dart';
 import 'fitfusion_game.dart';
 
@@ -15,16 +17,18 @@ import 'fitfusion_game.dart';
 class GameController {
   final FitFusionGame game;
   final RepDetector repDetector;
+  final PoseDetectorService poseDetectorService;
   final PaceMonitor paceMonitor;
   final AchievementService achievementService;
 
-  StreamSubscription<void>? _repSubscription;
-  StreamSubscription<void>? _paceSubscription;
+  StreamSubscription<RepEvent>? _repSubscription;
+  StreamSubscription<PaceEvent>? _paceSubscription;
   StreamSubscription<GamePhase>? _phaseSubscription;
 
   GameController({
     required this.game,
     required this.repDetector,
+    required this.poseDetectorService,
     required this.paceMonitor,
     required this.achievementService,
   }) {
@@ -35,7 +39,11 @@ class GameController {
     // Rep events → game
     _repSubscription = repDetector.repStream.listen((_) {
       if (game.phase == GamePhase.playing) {
-        paceMonitor.onRepReceived();
+        if (paceMonitor.isActive) {
+          paceMonitor.onRepReceived();
+        } else {
+          paceMonitor.startMonitoring();
+        }
         game.onRepDetected();
       }
     });
@@ -52,12 +60,16 @@ class GameController {
     _phaseSubscription = game.phaseStream.listen((phase) {
       switch (phase) {
         case GamePhase.playing:
-          // Pace timer starts immediately when playing begins
+          poseDetectorService.setEnabled(true);
+          repDetector.setEnabled(true);
+          // Pace timer starts immediately when playing begins.
           paceMonitor.startMonitoring();
           break;
         case GamePhase.cooldown:
         case GamePhase.victory:
         case GamePhase.defeat:
+          poseDetectorService.setEnabled(false);
+          repDetector.setEnabled(false);
           paceMonitor.stopMonitoring();
           break;
       }
@@ -68,6 +80,9 @@ class GameController {
     await _repSubscription?.cancel();
     await _paceSubscription?.cancel();
     await _phaseSubscription?.cancel();
-    debugPrint('[GameController] Disposed');
+    assert(() {
+      debugPrint('[GameController] Disposed');
+      return true;
+    }());
   }
 }

@@ -13,6 +13,7 @@ class PaceMonitor {
       StreamController<PaceEvent>.broadcast();
 
   Stream<PaceEvent> get paceStream => _paceController.stream;
+  bool get isActive => _isActive;
 
   /// Call this when the FIRST REP of a round is detected.
   /// This starts the pace timer. Do not call this before the first rep
@@ -22,7 +23,10 @@ class PaceMonitor {
     _isActive = true;
     _lastRepTime = DateTime.now();
     _resetTimer();
-    debugPrint('[PaceMonitor] Started monitoring');
+    assert(() {
+      debugPrint('[PaceMonitor] Started monitoring');
+      return true;
+    }());
   }
 
   /// Call this when a round ends (won or lost), during cooldown,
@@ -31,7 +35,10 @@ class PaceMonitor {
     _isActive = false;
     _paceTimer?.cancel();
     _paceTimer = null;
-    debugPrint('[PaceMonitor] Stopped monitoring');
+    assert(() {
+      debugPrint('[PaceMonitor] Stopped monitoring');
+      return true;
+    }());
   }
 
   /// Call this each time a rep is detected (after startMonitoring has been called).
@@ -65,7 +72,12 @@ class PaceMonitor {
   void _onPaceViolation() {
     if (!_isActive) return;
 
-    debugPrint('[PaceMonitor] PACE VIOLATION — no rep in ${kPaceThresholdSeconds}s');
+    assert(() {
+      debugPrint(
+        '[PaceMonitor] PACE VIOLATION — no rep in ${kPaceThresholdSeconds}s',
+      );
+      return true;
+    }());
 
     _paceController.add(PaceEvent(
       type: PaceEventType.paceFailed,
@@ -74,7 +86,7 @@ class PaceMonitor {
     ));
 
     // Restart the timer — the player must keep moving.
-    // The pace monitor keeps firing every 3 seconds until they do a rep
+    // The pace monitor keeps firing until they do a rep
     // or until stopMonitoring() is called.
     _resetTimer();
   }

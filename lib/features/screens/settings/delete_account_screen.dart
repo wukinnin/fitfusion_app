@@ -35,7 +35,6 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
 
     final supabase = Supabase.instance.client;
     final email = supabase.auth.currentUser!.email!;
-    final userId = supabase.auth.currentUser!.id;
 
     try {
       // 1. Re-authenticate with current password

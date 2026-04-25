@@ -7,49 +7,66 @@ import '../fitfusion_game.dart';
 class RoundBanner extends PositionComponent with HasGameReference<FitFusionGame> {
   int _round = 1;
   String _workoutLabel = '';
+  bool _roundDirty = true;
+  bool _workoutDirty = true;
+
+  final TextPainter _roundPainter = TextPainter(
+    textDirection: TextDirection.ltr,
+  );
+  final TextPainter _workoutPainter = TextPainter(
+    textDirection: TextDirection.ltr,
+  );
+  final TextStyle _roundStyle = GoogleFonts.cinzel(
+    color: const Color(0xFFFFD700),
+    fontSize: 22,
+    fontWeight: FontWeight.bold,
+    shadows: const [Shadow(blurRadius: 4, color: Colors.black)],
+  );
+  final TextStyle _workoutStyle = GoogleFonts.cinzel(
+    color: const Color(0xFFFFD700),
+    fontSize: 16,
+    fontWeight: FontWeight.bold,
+    shadows: const [Shadow(blurRadius: 3, color: Colors.black)],
+  );
 
   void setRound(int round) {
+    if (_round == round) return;
     _round = round;
+    _roundDirty = true;
   }
 
   void setWorkoutLabel(String label) {
+    if (_workoutLabel == label) return;
     _workoutLabel = label;
+    _workoutDirty = true;
   }
 
   @override
   void render(Canvas canvas) {
     final screenW = game.size.x;
 
-    // Round number — centered
-    final roundSpan = TextSpan(
-      text: 'ROUND $_round',
-      style: GoogleFonts.cinzel(
-        color: const Color(0xFFFFD700),
-        fontSize: 22,
-        fontWeight: FontWeight.bold,
-        shadows: const [Shadow(blurRadius: 4, color: Colors.black)],
-      ),
-    );
-    final roundTp = TextPainter(
-      text: roundSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    roundTp.paint(canvas, Offset((screenW - roundTp.width) / 2 - position.x, 0));
+    if (_roundDirty) {
+      _roundPainter.text = TextSpan(text: 'ROUND $_round', style: _roundStyle);
+      _roundPainter.layout();
+      _roundDirty = false;
+    }
 
-    // Workout label — centered below round
-    final workoutSpan = TextSpan(
-      text: _workoutLabel,
-      style: GoogleFonts.cinzel(
-        color: const Color(0xFFFFD700),
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        shadows: const [Shadow(blurRadius: 3, color: Colors.black)],
+    if (_workoutDirty) {
+      _workoutPainter.text = TextSpan(text: _workoutLabel, style: _workoutStyle);
+      _workoutPainter.layout();
+      _workoutDirty = false;
+    }
+
+    _roundPainter.paint(
+      canvas,
+      Offset((screenW - _roundPainter.width) / 2 - position.x, 0),
+    );
+    _workoutPainter.paint(
+      canvas,
+      Offset(
+        (screenW - _workoutPainter.width) / 2 - position.x,
+        _roundPainter.height + 4,
       ),
     );
-    final workoutTp = TextPainter(
-      text: workoutSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    workoutTp.paint(canvas, Offset((screenW - workoutTp.width) / 2 - position.x, roundTp.height + 4));
   }
 }

@@ -8,7 +8,7 @@ import '../fitfusion_game.dart';
 class MonsterComponent extends PositionComponent with HasGameReference<FitFusionGame> {
   static const double displayWidth = 96;
   static const double displayHeight = 144;
-  static const List<String> _monsterFiles = [
+  static const List<String> monsterFiles = [
     'monsters/monster_01.png',
     'monsters/monster_02.png',
     'monsters/monster_03.png',
@@ -22,8 +22,9 @@ class MonsterComponent extends PositionComponent with HasGameReference<FitFusion
   ];
 
   late final List<int> _shuffledOrder;
+  final List<Sprite> _sprites = [];
   int _monsterIndex = 0;
-  SpriteComponent? _spriteComp;
+  late final SpriteComponent _spriteComp;
 
   // White flash overlay for hit animation
   final _flashPaint = Paint()
@@ -38,24 +39,22 @@ class MonsterComponent extends PositionComponent with HasGameReference<FitFusion
     size = Vector2(displayWidth, displayHeight);
 
     // Shuffle monster order — no repetition linearly
-    _shuffledOrder = List.generate(_monsterFiles.length, (i) => i);
+    _shuffledOrder = List.generate(monsterFiles.length, (i) => i);
     _shuffledOrder.shuffle(Random());
     _monsterIndex = 0;
 
-    await _loadCurrentMonster();
-  }
-
-  Future<void> _loadCurrentMonster() async {
-    _spriteComp?.removeFromParent();
-
-    final fileName = _monsterFiles[_shuffledOrder[_monsterIndex % _monsterFiles.length]];
-    final sprite = await game.loadSprite(fileName);
+    final images = await Future.wait(monsterFiles.map(game.images.load));
+    _sprites.addAll(images.map(Sprite.new));
 
     _spriteComp = SpriteComponent(
-      sprite: sprite,
+      sprite: _sprites[_shuffledOrder[_monsterIndex]],
       size: Vector2(displayWidth, displayHeight),
     );
-    add(_spriteComp!);
+    add(_spriteComp);
+  }
+
+  void _loadCurrentMonster() {
+    _spriteComp.sprite = _sprites[_shuffledOrder[_monsterIndex % _sprites.length]];
   }
 
   void nextMonster() {
