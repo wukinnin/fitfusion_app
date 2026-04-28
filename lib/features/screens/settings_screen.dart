@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../services/app_bgm_service.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
 
@@ -76,6 +77,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleLogOut() async {
+    // Cancel any pending Knight pings so the next user (or this user upon
+    // re-login) gets a fresh batch.
+    await NotificationService.instance.cancelAll();
     await _client.auth.signOut();
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);

@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
+import '../knight/knight_card.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
     return Scaffold(
       backgroundColor: AppTheme.bloodRed,
       body: FitFusionAnimatedBackground(
@@ -22,24 +25,19 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Logo
-                        Image.asset(
-                          'assets/images/game/logo.png',
-                          height: 140,
-                          cacheWidth: 420,
-                          cacheHeight: 420,
-                          fit: BoxFit.contain,
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Exercise is the Gameplay',
-                          style: TextStyle(
-                            color: AppTheme.creamWhite.withValues(alpha: 0.7),
-                            fontSize: 14,
-                            fontStyle: FontStyle.italic,
+                        // Fitness Knight avatar + speech bubble
+                        // (replaces the prior logo + tagline block)
+                        if (userId != null)
+                          KnightCard(userId: userId)
+                        else
+                          Image.asset(
+                            'assets/images/game/logo.png',
+                            height: 140,
+                            cacheWidth: 420,
+                            cacheHeight: 420,
+                            fit: BoxFit.contain,
                           ),
-                        ),
-                        const SizedBox(height: 64),
+                        const SizedBox(height: 32),
 
                         // Play button — primary
                         SizedBox(

@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../fitfusion_game.dart';
 
-class MonsterComponent extends PositionComponent with HasGameReference<FitFusionGame> {
+class MonsterComponent extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   static const double displayWidth = 96;
   static const double displayHeight = 144;
   static const List<String> monsterFiles = [
@@ -54,7 +55,8 @@ class MonsterComponent extends PositionComponent with HasGameReference<FitFusion
   }
 
   void _loadCurrentMonster() {
-    _spriteComp.sprite = _sprites[_shuffledOrder[_monsterIndex % _sprites.length]];
+    _spriteComp.sprite =
+        _sprites[_shuffledOrder[_monsterIndex % _sprites.length]];
   }
 
   void nextMonster() {

@@ -1,0 +1,5 @@
+[warning] The asset directory 'assets/images/monster/' doesn't exist (/home/nimpad2/development/project/fitfusion_app/pubspec.yaml:97:7)
+[error] Too many positional arguments: 0 expected, but 1 found (/home/nimpad2/development/project/fitfusion_app/lib/services/notification_service.dart:37:7)
+[error] Undefined name 'UILocalNotificationDateInterpretation' (/home/nimpad2/development/project/fitfusion_app/lib/services/notification_service.dart:164:11)
+[error] The named parameter 'uiLocalNotificationDateInterpretation' isn't defined (/home/nimpad2/development/project/fitfusion_app/lib/services/notification_service.dart:163:7)
+[error] The named parameter 'settings' is required, but there's no corresponding argument (/home/nimpad2/development/project/fitfusion_app/lib/services/notification_service.dart:36:44)

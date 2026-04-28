@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../fitfusion_game.dart';
 
-class DamageFlashOverlay extends PositionComponent with HasGameReference<FitFusionGame> {
+class DamageFlashOverlay extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   static const double _flashDuration = 2.0;
   static const double _maxOpacity = 0.4;
 

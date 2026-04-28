@@ -49,10 +49,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
         Navigator.pushNamed(
           context,
           '/auth/verify',
-          arguments: {
-            'email': email,
-            'type': 'delete_account',
-          },
+          arguments: {'email': email, 'type': 'delete_account'},
         );
       }
     } on AuthException catch (e) {

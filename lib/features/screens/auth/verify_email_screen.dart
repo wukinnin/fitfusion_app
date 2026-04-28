@@ -50,7 +50,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   String _email = '';
-  String _type = 'signup'; // 'signup', 'recovery', 'email_change', or 'delete_account'
+  String _type =
+      'signup'; // 'signup', 'recovery', 'email_change', or 'delete_account'
 
   bool _returnOnSuccess = false;
   bool _argsParsed = false;
@@ -105,7 +106,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
             params: {'target_user_id': userId},
           );
 
-          if (response != null && response is Map && response['error'] != null) {
+          if (response != null &&
+              response is Map &&
+              response['error'] != null) {
             throw AuthException(response['error']);
           }
         }
@@ -149,11 +152,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           );
         } else if (_type == 'delete_account') {
           // Deletion: return to welcome screen
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            '/auth',
-            (route) => false,
-          );
+          Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
         } else {
           // Signup: go to login
           Navigator.pushNamedAndRemoveUntil(
@@ -238,7 +237,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _type == 'delete_account' ? 'CONFIRM DELETION' : 'VERIFY EMAIL',
+                    _type == 'delete_account'
+                        ? 'CONFIRM DELETION'
+                        : 'VERIFY EMAIL',
                     style: GoogleFonts.cinzelDecorative(
                       color: _type == 'delete_account'
                           ? AppTheme.crimson

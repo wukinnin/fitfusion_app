@@ -47,13 +47,13 @@ class PoseOverlayPainter extends CustomPainter {
     required this.inputImageSize,
     required this.lensDirection,
     required this.sensorOrientation,
-  })  : _paint = Paint()
-          ..color = Colors.greenAccent
-          ..style = PaintingStyle.fill,
-        _linePaint = Paint()
-          ..color = Colors.greenAccent.withValues(alpha: 0.5)
-          ..strokeWidth = 2
-          ..style = PaintingStyle.stroke;
+  }) : _paint = Paint()
+         ..color = Colors.greenAccent
+         ..style = PaintingStyle.fill,
+       _linePaint = Paint()
+         ..color = Colors.greenAccent.withValues(alpha: 0.5)
+         ..strokeWidth = 2
+         ..style = PaintingStyle.stroke;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -61,11 +61,7 @@ class PoseOverlayPainter extends CustomPainter {
     for (final landmark in pose.landmarks.values) {
       if (landmark.likelihood < kLandmarkLikelihoodThreshold) continue;
 
-      final offset = _transformCoordinates(
-        landmark.x,
-        landmark.y,
-        size,
-      );
+      final offset = _transformCoordinates(landmark.x, landmark.y, size);
 
       canvas.drawCircle(offset, 4, _paint);
     }
@@ -112,8 +108,12 @@ class PoseOverlayPainter extends CustomPainter {
     // However, inputImageSize is the raw buffer size (usually Landscape).
     // If sensor is 90/270, the ML Kit space is swapped (Portrait).
     final bool isRotated = sensorOrientation == 90 || sensorOrientation == 270;
-    final double imageLogicalWidth = isRotated ? inputImageSize.height : inputImageSize.width;
-    final double imageLogicalHeight = isRotated ? inputImageSize.width : inputImageSize.height;
+    final double imageLogicalWidth = isRotated
+        ? inputImageSize.height
+        : inputImageSize.width;
+    final double imageLogicalHeight = isRotated
+        ? inputImageSize.width
+        : inputImageSize.height;
 
     // 2. Normalize coordinates to [0, 1] based on logical size
     double normalizedX = x / imageLogicalWidth;
@@ -125,43 +125,43 @@ class PoseOverlayPainter extends CustomPainter {
     if (lensDirection == CameraLensDirection.front) {
       normalizedX = 1 - normalizedX;
     }
-    
+
     // Note: No explicit rotation step here because ML Kit + Metadata = Upright Coordinates.
 
     // 4. Scale to fit canvas (BoxFit.cover logic)
     // We need to determine the scale factor that covers the screen
     final double screenAspectRatio = canvasSize.width / canvasSize.height;
     final double imageAspectRatio = imageLogicalWidth / imageLogicalHeight;
-    
+
     double scale, offsetX, offsetY;
-    
+
     if (screenAspectRatio > imageAspectRatio) {
       // Screen is wider than image (crop top/bottom)
       // Fit width
       scale = canvasSize.width;
-      
+
       // Calculate drawn height preserving aspect ratio
       final double drawnHeight = canvasSize.width / imageAspectRatio;
-      
+
       offsetX = 0;
       offsetY = (canvasSize.height - drawnHeight) / 2;
-      
+
       return Offset(
         normalizedX * scale + offsetX,
-        normalizedY * drawnHeight + offsetY
+        normalizedY * drawnHeight + offsetY,
       );
     } else {
       // Screen is taller/narrower (crop left/right)
       // Fit height
       final double drawnHeight = canvasSize.height;
       final double drawnWidth = canvasSize.height * imageAspectRatio;
-      
+
       offsetX = (canvasSize.width - drawnWidth) / 2;
       offsetY = 0;
-      
+
       return Offset(
         normalizedX * drawnWidth + offsetX,
-        normalizedY * drawnHeight + offsetY
+        normalizedY * drawnHeight + offsetY,
       );
     }
   }

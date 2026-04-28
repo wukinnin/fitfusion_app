@@ -306,43 +306,45 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
               )
             : Column(
                 children: [
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _WorkoutButton(
-                        title: 'Squats',
-                        onPressed: () =>
-                            _onWorkoutSelected(context, WorkoutType.squats),
-                      ),
-                      const SizedBox(height: 16),
-                      _WorkoutButton(
-                        title: 'Jumping Jacks',
-                        onPressed: () => _onWorkoutSelected(
-                          context,
-                          WorkoutType.jumpingJacks,
+                  Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _WorkoutButton(
+                              title: 'Squats',
+                              onPressed: () => _onWorkoutSelected(
+                                context,
+                                WorkoutType.squats,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _WorkoutButton(
+                              title: 'Jumping Jacks',
+                              onPressed: () => _onWorkoutSelected(
+                                context,
+                                WorkoutType.jumpingJacks,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _WorkoutButton(
+                              title: 'Side Crunches',
+                              onPressed: () => _onWorkoutSelected(
+                                context,
+                                WorkoutType.obliqueCrunches,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      _WorkoutButton(
-                        title: 'Side Crunches',
-                        onPressed: () => _onWorkoutSelected(
-                          context,
-                          WorkoutType.obliqueCrunches,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const UserProfileFooter(),
+                ],
               ),
-            ),
-            const UserProfileFooter(),
-          ],
-        ),
       ),
     );
   }

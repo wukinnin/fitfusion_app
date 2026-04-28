@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../fitfusion_game.dart';
 
-class DamageNumber extends PositionComponent with HasGameReference<FitFusionGame> {
+class DamageNumber extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   static const double _lifetime = 1.0;
   static const double _riseSpeed = 60.0;
 

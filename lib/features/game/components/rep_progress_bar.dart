@@ -4,7 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../fitfusion_game.dart';
 
-class RepProgressBar extends PositionComponent with HasGameReference<FitFusionGame> {
+class RepProgressBar extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   int _reps = 0;
   int _required = 1;
   bool _isDirty = true;
@@ -38,7 +39,10 @@ class RepProgressBar extends PositionComponent with HasGameReference<FitFusionGa
   @override
   void render(Canvas canvas) {
     if (_isDirty) {
-      _textPainter.text = TextSpan(text: '$_reps/ $_required REPS', style: _textStyle);
+      _textPainter.text = TextSpan(
+        text: '$_reps/ $_required REPS',
+        style: _textStyle,
+      );
       _textPainter.layout();
       _bgRect = RRect.fromRectAndRadius(
         Rect.fromLTWH(-8, -4, _textPainter.width + 16, _textPainter.height + 8),

@@ -1,11 +1,6 @@
 import 'dart:ui';
 
-enum DetectedAction {
-  none,
-  squatting,
-  jumpingJack,
-  sideCrunch,
-}
+enum DetectedAction { none, squatting, jumpingJack, sideCrunch }
 
 class MotionState {
   final DetectedAction action;

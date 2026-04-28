@@ -10,7 +10,8 @@ import '../fitfusion_game.dart';
 ///
 /// Animation: slide-in from right (0.5s) → visible (2.0s) → slide-out to right (0.5s) → self-remove.
 /// Multiple popups stack downward via [stackIndex].
-class AchievementPopup extends PositionComponent with HasGameReference<FitFusionGame> {
+class AchievementPopup extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   static const double _slideInDuration = 0.5;
   static const double _visibleDuration = 2.0;
   static const double _slideOutDuration = 0.5;
@@ -49,7 +50,8 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
 
   /// The Y offset for this popup based on its stack position.
   /// Positioned below the pace timer area (row2Y ≈ 66, pace timer height ≈ 84).
-  double get _baseY => 66.0 + 84.0 + 12.0 + stackIndex * (popupRadius * 2 + popupSpacing);
+  double get _baseY =>
+      66.0 + 84.0 + 12.0 + stackIndex * (popupRadius * 2 + popupSpacing);
 
   /// The resting X position (fully visible) — right-aligned like the pace timer.
   double get _restX => game.size.x - popupRadius * 2 - 12;
@@ -79,8 +81,9 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
       x = _restX;
     } else {
       // Slide out to right
-      final t = ((_elapsed - _slideInDuration - _visibleDuration) / _slideOutDuration)
-          .clamp(0.0, 1.0);
+      final t =
+          ((_elapsed - _slideInDuration - _visibleDuration) / _slideOutDuration)
+              .clamp(0.0, 1.0);
       final eased = _easeInCubic(t);
       x = _restX + (_offScreenX - _restX) * eased;
     }
@@ -94,18 +97,10 @@ class AchievementPopup extends PositionComponent with HasGameReference<FitFusion
     final center = Offset(popupRadius, popupRadius);
 
     // Background circle — dark with slight transparency
-    canvas.drawCircle(
-      center,
-      popupRadius,
-      _backgroundPaint,
-    );
+    canvas.drawCircle(center, popupRadius, _backgroundPaint);
 
     // Gold border
-    canvas.drawCircle(
-      center,
-      popupRadius,
-      _borderPaint,
-    );
+    canvas.drawCircle(center, popupRadius, _borderPaint);
 
     // Trophy icon — drawn as a simple geometric shape
     _drawTrophy(canvas, center, popupRadius * 0.45);

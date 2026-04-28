@@ -4,7 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../fitfusion_game.dart';
 
-class RoundBanner extends PositionComponent with HasGameReference<FitFusionGame> {
+class RoundBanner extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   int _round = 1;
   String _workoutLabel = '';
   bool _roundDirty = true;
@@ -52,7 +53,10 @@ class RoundBanner extends PositionComponent with HasGameReference<FitFusionGame>
     }
 
     if (_workoutDirty) {
-      _workoutPainter.text = TextSpan(text: _workoutLabel, style: _workoutStyle);
+      _workoutPainter.text = TextSpan(
+        text: _workoutLabel,
+        style: _workoutStyle,
+      );
       _workoutPainter.layout();
       _workoutDirty = false;
     }

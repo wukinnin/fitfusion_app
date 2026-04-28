@@ -5,10 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/enums.dart';
 import '../../core/theme.dart';
+import '../../services/notification_service.dart';
 import '../../services/session_service.dart';
+import '../knight/knight_service.dart';
 import '../../widgets/camera_preview_widget.dart';
 import '../../widgets/pose_overlay_painter.dart';
 import '../achievements/achievement_service.dart';
@@ -172,6 +175,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
 
     if (mounted) setState(() => _isSaving = false);
+
+    // Stamp the Knight session timestamp (only counts if rounds >= 3) and
+    // refresh the upcoming week of scheduled pings so the projected
+    // disposition reflects this fresh activity.
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId != null) {
+      await KnightService.markSessionCompleted(userId, session.roundsCompleted);
+      // ignore: unawaited_futures
+      NotificationService.instance.rescheduleKnightPings(userId);
+    }
 
     // 2. Evaluate achievements against session + lifetime stats views
     final newlyUnlocked = await _achievementService.evaluateSession(session);

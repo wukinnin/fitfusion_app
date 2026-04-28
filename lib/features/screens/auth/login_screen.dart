@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../features/knight/knight_service.dart';
+import '../../../services/notification_service.dart';
 import '../../../widgets/fitfusion_animated_background.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -111,6 +113,13 @@ class _LoginScreenState extends State<LoginScreen> {
           }
           return;
         }
+      }
+
+      // Stamp Knight login + (re)schedule the next 7 days of daily pings.
+      if (user != null) {
+        await KnightService.markLogin(user.id);
+        // ignore: unawaited_futures
+        NotificationService.instance.rescheduleKnightPings(user.id);
       }
 
       if (mounted) {

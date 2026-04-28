@@ -7,7 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants.dart';
 import '../fitfusion_game.dart';
 
-class PaceTimerIndicator extends PositionComponent with HasGameReference<FitFusionGame> {
+class PaceTimerIndicator extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   static const double radius = 42;
   static const double dangerThreshold = 2.0;
   static const Offset _center = Offset(radius, radius);

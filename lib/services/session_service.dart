@@ -14,7 +14,9 @@ class SessionService {
   static Future<void> saveSession(GameSession session) async {
     final user = _client.auth.currentUser;
     if (user == null) {
-      throw SessionSaveException('No authenticated user — cannot save session.');
+      throw SessionSaveException(
+        'No authenticated user — cannot save session.',
+      );
     }
 
     // On defeat, timing stats are forfeit — save as NULL.
@@ -30,10 +32,14 @@ class SessionService {
       'lives_lost': session.livesLost,
       'total_time_seconds': isVictory ? session.totalTimeSeconds : null,
       'best_rep_interval_seconds': isVictory
-          ? (session.bestRepIntervalSeconds > 0 ? session.bestRepIntervalSeconds : null)
+          ? (session.bestRepIntervalSeconds > 0
+                ? session.bestRepIntervalSeconds
+                : null)
           : null,
       'avg_rep_interval_seconds': isVictory
-          ? (session.avgRepIntervalSeconds > 0 ? session.avgRepIntervalSeconds : null)
+          ? (session.avgRepIntervalSeconds > 0
+                ? session.avgRepIntervalSeconds
+                : null)
           : null,
       'completed_at': session.completedAt.toUtc().toIso8601String(),
     };

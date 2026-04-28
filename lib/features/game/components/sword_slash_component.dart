@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../fitfusion_game.dart';
 
-class SwordSlashComponent extends PositionComponent with HasGameReference<FitFusionGame> {
+class SwordSlashComponent extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   static const double _lifetime = 0.35;
   static const double slashWidth = 120;
   static const double slashHeight = 80;

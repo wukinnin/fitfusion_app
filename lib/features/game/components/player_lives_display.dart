@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import '../../../core/constants.dart';
 import '../fitfusion_game.dart';
 
-class PlayerLivesDisplay extends PositionComponent with HasGameReference<FitFusionGame> {
+class PlayerLivesDisplay extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   static const double heartSize = 66;
   static const double heartSpacing = 14;
 
@@ -49,8 +50,22 @@ class PlayerLivesDisplay extends PositionComponent with HasGameReference<FitFusi
     final path = Path();
     final r = radius;
     path.moveTo(cx, cy + r * 0.5);
-    path.cubicTo(cx - r * 1.2, cy - r * 0.3, cx - r * 0.6, cy - r * 1.2, cx, cy - r * 0.5);
-    path.cubicTo(cx + r * 0.6, cy - r * 1.2, cx + r * 1.2, cy - r * 0.3, cx, cy + r * 0.5);
+    path.cubicTo(
+      cx - r * 1.2,
+      cy - r * 0.3,
+      cx - r * 0.6,
+      cy - r * 1.2,
+      cx,
+      cy - r * 0.5,
+    );
+    path.cubicTo(
+      cx + r * 0.6,
+      cy - r * 1.2,
+      cx + r * 1.2,
+      cy - r * 0.3,
+      cx,
+      cy + r * 0.5,
+    );
     path.close();
     return path;
   }
