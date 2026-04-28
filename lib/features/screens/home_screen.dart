@@ -46,7 +46,7 @@ class HomeScreen extends StatelessWidget {
                           height: 60,
                           child: ElevatedButton(
                             onPressed: () =>
-                                Navigator.pushNamed(context, '/select'),
+                                Navigator.pushNamed(context, '/select/mode'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.gold,
                               foregroundColor: AppTheme.bloodRed,

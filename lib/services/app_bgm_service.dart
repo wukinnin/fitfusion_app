@@ -10,6 +10,11 @@ bool shouldPlayMenuForRoute(String? routeName) {
   const allowedRoutes = <String>{
     '/home',
     '/select',
+    '/select/mode',
+    '/select/workout/singleplayer',
+    '/select/workout/multiplayer',
+    '/select/cooldown',
+    '/multiplayer/p2-email',
     '/leaderboard',
     '/stats',
     '/achievements',

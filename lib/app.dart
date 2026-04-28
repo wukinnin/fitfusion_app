@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme.dart';
+import 'features/multiplayer/p2_session_cache.dart';
 import 'features/screens/achievements_screen.dart';
 import 'features/screens/auth/auth_landing_screen.dart';
 import 'features/screens/auth/forgot_password_screen.dart';
@@ -12,6 +13,11 @@ import 'features/screens/auth/verify_email_screen.dart';
 import 'features/screens/game_screen.dart';
 import 'features/screens/home_screen.dart';
 import 'features/screens/leaderboard_screen.dart';
+import 'features/screens/play/cooldown_select_screen.dart';
+import 'features/screens/play/mode_select_screen.dart';
+import 'features/screens/play/p2_email_screen.dart';
+import 'features/screens/play/workout_select_multiplayer_screen.dart';
+import 'features/screens/play/workout_select_singleplayer_screen.dart';
 import 'features/screens/results_screen.dart';
 import 'features/screens/settings/change_email_screen.dart';
 import 'features/screens/settings/change_username_screen.dart';
@@ -46,6 +52,8 @@ class _FitFusionAppState extends State<FitFusionApp> {
       final event = data.event;
 
       if (event == AuthChangeEvent.signedOut) {
+        // Drop any cached Player 2 — it belongs to the previous session.
+        P2SessionCache.instance.clear();
         // Force redirect to auth landing if session is lost
         _navigatorKey.currentState?.pushNamedAndRemoveUntil(
           '/auth',
@@ -79,7 +87,16 @@ class _FitFusionAppState extends State<FitFusionApp> {
         '/auth/forgot-password': (context) => const ForgotPasswordScreen(),
         '/auth/reset-password': (context) => const ResetPasswordScreen(),
         '/home': (context) => const HomeScreen(),
+        // Legacy entry — kept for backward compatibility while the new
+        // multi-step play flow is verified. Home no longer points here.
         '/select': (context) => const WorkoutSelectScreen(),
+        '/select/mode': (context) => const ModeSelectScreen(),
+        '/select/workout/singleplayer': (context) =>
+            const WorkoutSelectSingleplayerScreen(),
+        '/select/workout/multiplayer': (context) =>
+            const WorkoutSelectMultiplayerScreen(),
+        '/multiplayer/p2-email': (context) => const P2EmailScreen(),
+        '/select/cooldown': (context) => const CooldownSelectScreen(),
         '/game': (context) => const GameScreen(),
         '/results': (context) => const ResultsScreen(),
         '/leaderboard': (context) => const LeaderboardScreen(),
