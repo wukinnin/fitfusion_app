@@ -135,6 +135,7 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -231,7 +232,6 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
                 ),
               ),
             ),
-            const UserProfileFooter(),
           ],
         ),
       ),

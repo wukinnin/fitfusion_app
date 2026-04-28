@@ -4,11 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme.dart';
 
-/// A footer widget that displays the current user's username (and optionally
-/// their masked email) anchored to the bottom-center of the screen.
+/// A header widget that displays the current user's username (and optionally
+/// their masked email) anchored to the top-center of the screen.
 ///
-/// Place this inside a [Stack] or at the bottom of a [Column] so it sits
-/// flush with the bottom safe area.
+/// Place this at the top of a [Column] so it sits flush with the top safe
+/// area, above the screen's main content.
 ///
 /// When [showEmail] is true the email is displayed below the username with
 /// the middle portion masked for privacy (matching the Edit Profile mockup).
@@ -66,9 +66,9 @@ class _UserProfileFooterState extends State<UserProfileFooter> {
     if (_username == null) return const SizedBox.shrink();
 
     return SafeArea(
-      top: false,
+      bottom: false,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.only(top: 12, bottom: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

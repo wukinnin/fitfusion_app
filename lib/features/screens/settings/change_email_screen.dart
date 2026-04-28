@@ -150,6 +150,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -248,7 +249,6 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                 ),
               ),
             ),
-            const UserProfileFooter(),
           ],
         ),
       ),

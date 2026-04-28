@@ -117,6 +117,7 @@ class _ResetPasswordSettingsScreenState
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -189,7 +190,6 @@ class _ResetPasswordSettingsScreenState
                 ),
               ),
             ),
-            const UserProfileFooter(),
           ],
         ),
       ),

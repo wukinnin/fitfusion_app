@@ -18,6 +18,7 @@ class HomeScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
+              const UserProfileFooter(),
               Expanded(
                 child: Center(
                   child: Padding(
@@ -179,7 +180,6 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const UserProfileFooter(),
             ],
           ),
         ),

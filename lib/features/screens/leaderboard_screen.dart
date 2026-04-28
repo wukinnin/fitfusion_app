@@ -156,6 +156,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(),
             Expanded(
               child: _loading
                   ? const Center(
@@ -171,7 +172,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       ],
                     ),
             ),
-            const UserProfileFooter(),
           ],
         ),
       ),

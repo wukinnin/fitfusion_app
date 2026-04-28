@@ -94,6 +94,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -245,7 +246,6 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                 ),
               ),
             ),
-            const UserProfileFooter(),
           ],
         ),
       ),

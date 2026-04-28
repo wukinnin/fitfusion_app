@@ -306,6 +306,7 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
               )
             : Column(
                 children: [
+                  const UserProfileFooter(),
                   Expanded(
                     child: Center(
                       child: Padding(
@@ -342,7 +343,6 @@ class _WorkoutSelectScreenState extends State<WorkoutSelectScreen> {
                       ),
                     ),
                   ),
-                  const UserProfileFooter(),
                 ],
               ),
       ),

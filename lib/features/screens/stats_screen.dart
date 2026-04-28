@@ -229,6 +229,7 @@ class _StatsScreenState extends State<StatsScreen>
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(),
             Expanded(
               child: _loading
                   ? const Center(
@@ -244,7 +245,6 @@ class _StatsScreenState extends State<StatsScreen>
                       ],
                     ),
             ),
-            const UserProfileFooter(),
           ],
         ),
       ),

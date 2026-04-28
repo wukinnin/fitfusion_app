@@ -31,6 +31,7 @@ class EditProfileScreen extends StatelessWidget {
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(showEmail: true),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -66,8 +67,6 @@ class EditProfileScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const Spacer(),
-            const UserProfileFooter(showEmail: true),
           ],
         ),
       ),

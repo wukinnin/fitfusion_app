@@ -114,6 +114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(),
             Expanded(
               child: _loading
                   ? const Center(
@@ -164,7 +165,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
             ),
-            const UserProfileFooter(),
           ],
         ),
       ),
