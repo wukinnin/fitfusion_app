@@ -37,7 +37,7 @@ class WorkoutSelectSingleplayerScreen extends StatelessWidget {
           'CHOOSE YOUR BATTLE',
           style: GoogleFonts.cinzelDecorative(
             color: AppTheme.gold,
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),

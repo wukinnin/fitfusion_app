@@ -23,7 +23,7 @@ class ModeSelectScreen extends StatelessWidget {
           'CHOOSE A MODE',
           style: GoogleFonts.cinzelDecorative(
             color: AppTheme.gold,
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -81,11 +81,11 @@ class _ModeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 80,
-      child: ElevatedButton(
+      child: OutlinedButton(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.gold,
-          foregroundColor: AppTheme.bloodRed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppTheme.gold,
+          side: const BorderSide(color: AppTheme.gold, width: 2),
           padding: const EdgeInsets.symmetric(vertical: 20),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),

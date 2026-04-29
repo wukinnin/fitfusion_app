@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
 import '../../features/knight/knight_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/user_service.dart';
 import '../../widgets/fitfusion_animated_background.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -27,6 +28,11 @@ class _SplashScreenState extends State<SplashScreen> {
         // Fire and forget — don't block navigation on scheduling.
         // ignore: unawaited_futures
         NotificationService.instance.rescheduleKnightPings(user.id);
+
+        // Warm the username/email cache so the UserProfileFooter renders
+        // synchronously on the very first home-screen frame. This is what
+        // kills the post-splash header pop-in.
+        await UserService.preload();
 
         if (!mounted) return;
         final forceReset = user.userMetadata?['force_password_reset'] == true;

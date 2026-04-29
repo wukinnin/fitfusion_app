@@ -130,7 +130,7 @@ class _P2EmailScreenState extends State<P2EmailScreen> {
           'PLAYER 2',
           style: GoogleFonts.cinzelDecorative(
             color: AppTheme.gold,
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -213,13 +213,14 @@ class _P2EmailScreenState extends State<P2EmailScreen> {
                     const SizedBox(height: 24),
                     SizedBox(
                       height: 56,
-                      child: ElevatedButton(
+                      child: OutlinedButton(
                         onPressed: _isSending ? null : _handleSendCode,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.gold,
-                          foregroundColor: AppTheme.bloodRed,
-                          disabledBackgroundColor:
-                              AppTheme.gold.withValues(alpha: 0.4),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.gold,
+                          side: const BorderSide(
+                            color: AppTheme.gold,
+                            width: 2,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -230,7 +231,7 @@ class _P2EmailScreenState extends State<P2EmailScreen> {
                                 height: 22,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2.5,
-                                  color: AppTheme.bloodRed,
+                                  color: AppTheme.gold,
                                 ),
                               )
                             : const Text(

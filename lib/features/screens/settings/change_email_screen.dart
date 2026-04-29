@@ -141,7 +141,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
           'CHANGE EMAIL',
           style: GoogleFonts.cinzelDecorative(
             color: AppTheme.gold,
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -161,8 +161,10 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                     TextField(
                       controller: _currentPasswordController,
                       obscureText: _obscurePassword,
-                      style: GoogleFonts.crimsonText(
+                      style: const TextStyle(
+                        fontFamily: 'Georgia',
                         color: AppTheme.creamWhite,
+                        fontSize: 16,
                       ),
                       decoration: InputDecoration(
                         labelText: 'Current Password',
@@ -218,11 +220,14 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                     const SizedBox(height: 32),
                     SizedBox(
                       height: 52,
-                      child: ElevatedButton(
+                      child: OutlinedButton(
                         onPressed: _isLoading ? null : _handleChangeEmail,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.gold,
-                          foregroundColor: AppTheme.bloodRed,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.gold,
+                          side: const BorderSide(
+                            color: AppTheme.gold,
+                            width: 2,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -232,7 +237,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                                 width: 24,
                                 height: 24,
                                 child: CircularProgressIndicator(
-                                  color: AppTheme.bloodRed,
+                                  color: AppTheme.gold,
                                   strokeWidth: 2,
                                 ),
                               )
@@ -263,7 +268,11 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: GoogleFonts.crimsonText(color: AppTheme.creamWhite),
+      style: const TextStyle(
+        fontFamily: 'Georgia',
+        color: AppTheme.creamWhite,
+        fontSize: 16,
+      ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.crimsonText(

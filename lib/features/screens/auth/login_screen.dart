@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme.dart';
 import '../../../features/knight/knight_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../services/user_service.dart';
 import '../../../widgets/fitfusion_animated_background.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -120,6 +121,9 @@ class _LoginScreenState extends State<LoginScreen> {
         await KnightService.markLogin(user.id);
         // ignore: unawaited_futures
         NotificationService.instance.rescheduleKnightPings(user.id);
+        // Warm the username/email cache before the home screen mounts so the
+        // header renders on the first frame (no async pop-in).
+        await UserService.preload();
       }
 
       if (mounted) {

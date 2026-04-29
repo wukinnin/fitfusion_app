@@ -7,6 +7,7 @@ import '../../features/knight/knight_disposition.dart';
 import '../../features/knight/knight_service.dart';
 import '../../services/app_bgm_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/user_service.dart';
 import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
 
@@ -84,6 +85,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // re-login) gets a fresh batch.
     await NotificationService.instance.cancelAll();
     await _client.auth.signOut();
+    // Wipe the cached username/email so the welcome/login screens don't
+    // briefly flash the previous user's header.
+    UserService.clear();
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
     }

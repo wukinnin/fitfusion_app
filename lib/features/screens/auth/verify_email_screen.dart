@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/enums.dart';
 import '../../../core/theme.dart';
+import '../../../services/user_service.dart';
 import '../../../widgets/fitfusion_animated_background.dart';
 import '../../multiplayer/p2_verification_service.dart';
 
@@ -161,6 +162,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         }
         // Sign out and redirect to welcome
         await supabase.auth.signOut();
+        UserService.clear();
       } else if (_type == 'signup') {
         // Mark email as verified in public.users
         final userId = supabase.auth.currentUser?.id;
@@ -181,6 +183,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               .update({'email': _email})
               .eq('id', userId);
         }
+        // Update the in-memory cache so any mounted footer reflects the
+        // new email immediately.
+        await UserService.refresh();
       }
 
       if (mounted) {

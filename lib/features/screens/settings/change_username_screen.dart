@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme.dart';
+import '../../../services/user_service.dart';
 import '../../../widgets/fitfusion_animated_background.dart';
 import '../../../widgets/user_profile_footer.dart';
 
@@ -80,6 +81,10 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
         UserAttributes(data: {'username': newUsername}),
       );
 
+      // Refresh the in-memory cache so every mounted UserProfileFooter
+      // updates on its next frame without a manual rebuild.
+      await UserService.refresh();
+
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -146,8 +151,10 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
                     TextField(
                       controller: _currentPasswordController,
                       obscureText: _obscurePassword,
-                      style: GoogleFonts.crimsonText(
+                      style: const TextStyle(
+                        fontFamily: 'Georgia',
                         color: AppTheme.creamWhite,
+                        fontSize: 16,
                       ),
                       decoration: InputDecoration(
                         labelText: 'Current Password',
@@ -201,11 +208,14 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
                     const SizedBox(height: 32),
                     SizedBox(
                       height: 52,
-                      child: ElevatedButton(
+                      child: OutlinedButton(
                         onPressed: _isLoading ? null : _handleChangeUsername,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.gold,
-                          foregroundColor: AppTheme.bloodRed,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.gold,
+                          side: const BorderSide(
+                            color: AppTheme.gold,
+                            width: 2,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -215,7 +225,7 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
                                 width: 24,
                                 height: 24,
                                 child: CircularProgressIndicator(
-                                  color: AppTheme.bloodRed,
+                                  color: AppTheme.gold,
                                   strokeWidth: 2,
                                 ),
                               )
@@ -244,7 +254,11 @@ class _ChangeUsernameScreenState extends State<ChangeUsernameScreen> {
   }) {
     return TextField(
       controller: controller,
-      style: GoogleFonts.crimsonText(color: AppTheme.creamWhite),
+      style: const TextStyle(
+        fontFamily: 'Georgia',
+        color: AppTheme.creamWhite,
+        fontSize: 16,
+      ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.crimsonText(
