@@ -45,6 +45,7 @@ enum _CrunchSideState { extended, crunching }
 
 class RepDetector {
   final WorkoutType workoutType;
+  final bool lenientJumpingJacks;
 
   late final StreamSubscription<Pose?> _poseSubscription;
   final StreamController<RepEvent> _repController =
@@ -100,10 +101,33 @@ class RepDetector {
     kLandmarkBufferWindowSize,
   );
 
-  RepDetector({required this.workoutType, required Stream<Pose?> poseStream}) {
+  RepDetector({
+    required this.workoutType,
+    required Stream<Pose?> poseStream,
+    this.lenientJumpingJacks = false,
+  }) {
     _initializeStateForWorkout();
     _poseSubscription = poseStream.listen(_onPose);
   }
+
+  double get _jumpingJackWristRaiseThreshold => lenientJumpingJacks
+      ? kMultiplayerJumpingJackWristRaiseThreshold
+      : kJumpingJackWristRaiseThreshold;
+
+  double get _jumpingJackArmsDownThreshold =>
+      lenientJumpingJacks ? kMultiplayerJumpingJackArmsDownThreshold : 0.0;
+
+  double get _jumpingJackPerLegThreshold => lenientJumpingJacks
+      ? kMultiplayerJumpingJackPerLegThreshold
+      : kJumpingJackPerLegThreshold;
+
+  double get _jumpingJackLegsTogetherRatio => lenientJumpingJacks
+      ? kMultiplayerJumpingJackLegsTogetherRatio
+      : kJumpingJackLegsTogetherRatio;
+
+  double get _landmarkLikelihoodThreshold => lenientJumpingJacks
+      ? kMultiplayerRepLandmarkLikelihoodThreshold
+      : kLandmarkLikelihoodThreshold;
 
   void _initializeStateForWorkout() {
     reset();
@@ -277,15 +301,15 @@ class RepDetector {
 
     if (leftHip != null &&
         leftKnee != null &&
-        leftHip.likelihood >= kLandmarkLikelihoodThreshold &&
-        leftKnee.likelihood >= kLandmarkLikelihoodThreshold) {
+        leftHip.likelihood >= _landmarkLikelihoodThreshold &&
+        leftKnee.likelihood >= _landmarkLikelihoodThreshold) {
       leftDelta = leftKnee.y - leftHip.y;
     }
 
     if (rightHip != null &&
         rightKnee != null &&
-        rightHip.likelihood >= kLandmarkLikelihoodThreshold &&
-        rightKnee.likelihood >= kLandmarkLikelihoodThreshold) {
+        rightHip.likelihood >= _landmarkLikelihoodThreshold &&
+        rightKnee.likelihood >= _landmarkLikelihoodThreshold) {
       rightDelta = rightKnee.y - rightHip.y;
     }
 
@@ -347,9 +371,9 @@ class RepDetector {
         // AND Legs must be symmetrically apart
         // symmetrySmoothed = min(distL, distR) / shoulderWidth.
         // If one leg stays in, symmetrySmoothed will be small.
-        if (leftSmoothed > kJumpingJackWristRaiseThreshold &&
-            rightSmoothed > kJumpingJackWristRaiseThreshold &&
-            symmetrySmoothed > kJumpingJackPerLegThreshold) {
+        if (leftSmoothed > _jumpingJackWristRaiseThreshold &&
+            rightSmoothed > _jumpingJackWristRaiseThreshold &&
+            symmetrySmoothed > _jumpingJackPerLegThreshold) {
           _jackState = _JumpingJackState.armsUp;
           assert(() {
             debugPrint('[RepDetector] Jumping Jack UP detected (Symmetrical)');
@@ -361,9 +385,9 @@ class RepDetector {
       case _JumpingJackState.armsUp:
         // Arms return down: wrist drops back below shoulder
         // AND Legs must be together (total spread small)
-        if (leftSmoothed <= 0 &&
-            rightSmoothed <= 0 &&
-            spreadSmoothed < kJumpingJackLegsTogetherRatio) {
+        if (leftSmoothed <= _jumpingJackArmsDownThreshold &&
+            rightSmoothed <= _jumpingJackArmsDownThreshold &&
+            spreadSmoothed < _jumpingJackLegsTogetherRatio) {
           _jackState = _JumpingJackState.armsDown;
           _emitRep();
         }
@@ -389,12 +413,12 @@ class RepDetector {
     }
 
     // Check likelihoods
-    if (leftShoulder.likelihood < kLandmarkLikelihoodThreshold ||
-        rightShoulder.likelihood < kLandmarkLikelihoodThreshold ||
-        leftHip.likelihood < kLandmarkLikelihoodThreshold ||
-        rightHip.likelihood < kLandmarkLikelihoodThreshold ||
-        leftAnkle.likelihood < kLandmarkLikelihoodThreshold ||
-        rightAnkle.likelihood < kLandmarkLikelihoodThreshold) {
+    if (leftShoulder.likelihood < _landmarkLikelihoodThreshold ||
+        rightShoulder.likelihood < _landmarkLikelihoodThreshold ||
+        leftHip.likelihood < _landmarkLikelihoodThreshold ||
+        rightHip.likelihood < _landmarkLikelihoodThreshold ||
+        leftAnkle.likelihood < _landmarkLikelihoodThreshold ||
+        rightAnkle.likelihood < _landmarkLikelihoodThreshold) {
       return null;
     }
 
@@ -432,8 +456,8 @@ class RepDetector {
     final shoulder = pose.landmarks[shoulderType];
 
     if (wrist == null || shoulder == null) return null;
-    if (wrist.likelihood < kLandmarkLikelihoodThreshold) return null;
-    if (shoulder.likelihood < kLandmarkLikelihoodThreshold) return null;
+    if (wrist.likelihood < _landmarkLikelihoodThreshold) return null;
+    if (shoulder.likelihood < _landmarkLikelihoodThreshold) return null;
 
     // shoulder.y - wrist.y:
     // Positive = wrist is higher than shoulder (arms raised)
@@ -626,8 +650,8 @@ class RepDetector {
     final b = pose.landmarks[typeB];
 
     if (a == null || b == null) return null;
-    if (a.likelihood < kLandmarkLikelihoodThreshold) return null;
-    if (b.likelihood < kLandmarkLikelihoodThreshold) return null;
+    if (a.likelihood < _landmarkLikelihoodThreshold) return null;
+    if (b.likelihood < _landmarkLikelihoodThreshold) return null;
 
     final dx = a.x - b.x;
     final dy = a.y - b.y;
@@ -641,8 +665,8 @@ class RepDetector {
     final rs = pose.landmarks[PoseLandmarkType.rightShoulder];
 
     if (ls == null || rs == null) return null;
-    if (ls.likelihood < kLandmarkLikelihoodThreshold) return null;
-    if (rs.likelihood < kLandmarkLikelihoodThreshold) return null;
+    if (ls.likelihood < _landmarkLikelihoodThreshold) return null;
+    if (rs.likelihood < _landmarkLikelihoodThreshold) return null;
 
     final dx = ls.x - rs.x;
     final dy = ls.y - rs.y;

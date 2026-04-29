@@ -170,10 +170,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           _player1RepDetector = RepDetector(
             workoutType: WorkoutType.jumpingJacks,
             poseStream: _multiplayerPoseDetectorService.player1PoseStream,
+            lenientJumpingJacks: true,
           );
           _player2RepDetector = RepDetector(
             workoutType: WorkoutType.jumpingJacks,
             poseStream: _multiplayerPoseDetectorService.player2PoseStream,
+            lenientJumpingJacks: true,
           );
         } else {
           _poseDetectorService.startProcessing(

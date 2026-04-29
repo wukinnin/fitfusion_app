@@ -14,7 +14,7 @@ import 'fitfusion_game.dart';
 /// events into game actions, and manages pace monitoring lifecycle.
 /// Also evaluates achievements at session end.
 class GameController {
-  static const Duration multiplayerRepSyncWindow = Duration(milliseconds: 750);
+  static const Duration multiplayerRepSyncWindow = Duration(milliseconds: 1200);
 
   final FitFusionGame game;
   final RepDetector? repDetector;

@@ -32,6 +32,15 @@ const double kJumpingJackPerLegThreshold =
     0.55; // Each leg must be > 0.55x shoulder width from center
 const double kJumpingJackLegsTogetherRatio =
     0.9; // Ankle separation must be < 0.9x shoulder width
+const double kMultiplayerJumpingJackWristRaiseThreshold =
+    -0.02; // Forgiving: wrists can be roughly shoulder-height
+const double kMultiplayerJumpingJackArmsDownThreshold =
+    0.12; // Forgiving: arms only need to return near shoulder height
+const double kMultiplayerJumpingJackPerLegThreshold =
+    0.35; // Forgiving: smaller per-leg extension still counts
+const double kMultiplayerJumpingJackLegsTogetherRatio =
+    1.25; // Forgiving: feet do not need to fully close
+const double kMultiplayerRepLandmarkLikelihoodThreshold = 0.35;
 // Standing Oblique Side Crunch thresholds (all normalised by shoulder width)
 // kCrunchElbowKneeCrunchThreshold    — elbow↔knee ratio must fall BELOW this to enter the crunching state
 // kCrunchElbowKneeExtendedThreshold  — elbow↔knee ratio must rise ABOVE this to complete the rep (hysteresis gap prevents false counts)
