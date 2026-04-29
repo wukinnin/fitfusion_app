@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
+import '../../features/knight/knight_disposition.dart';
+import '../../features/knight/knight_service.dart';
 import '../../services/app_bgm_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/fitfusion_animated_background.dart';
@@ -21,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _showTutorial = true;
   double _volume = 1.0;
   bool _loading = true;
+  KnightDisposition? _testDisposition;
 
   @override
   void initState() {
@@ -160,6 +163,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             label: 'Log Out',
                             color: AppTheme.crimson,
                             onTap: () => _handleLogOut(),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Dev / Test
+                          _buildSectionHeader('DEV / TEST'),
+                          const SizedBox(height: 8),
+                          _buildTestDispositionRow(),
+                          const SizedBox(height: 12),
+                          _buildActionTile(
+                            icon: Icons.notifications_active,
+                            label: 'Send Test Notification',
+                            color: AppTheme.emerald,
+                            onTap: () => _handleTestNotification(),
                           ),
                         ],
                       ),
@@ -304,6 +320,106 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _setTestDisposition(KnightDisposition d) {
+    setState(() => _testDisposition = d);
+    KnightService.setTestOverride(d);
+  }
+
+  void _clearTestDisposition() {
+    setState(() => _testDisposition = null);
+    KnightService.clearTestOverride();
+  }
+
+  Future<void> _handleTestNotification() async {
+    final disposition = _testDisposition ?? KnightDisposition.praise;
+    await NotificationService.instance.sendTestNotification(disposition);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Test notification sent (${disposition.name})',
+            style: GoogleFonts.cinzel(color: AppTheme.creamWhite),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildTestDispositionRow() {
+    final dispositions = KnightDisposition.values;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Override Knight Disposition',
+            style: const TextStyle(
+              color: AppTheme.creamWhite,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final d in dispositions)
+                ChoiceChip(
+                  label: Text(
+                    d.name[0].toUpperCase() + d.name.substring(1),
+                    style: GoogleFonts.cinzel(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _testDisposition == d
+                          ? AppTheme.bloodRed
+                          : AppTheme.gold,
+                    ),
+                  ),
+                  selected: _testDisposition == d,
+                  onSelected: (selected) {
+                    if (selected) {
+                      _setTestDisposition(d);
+                    } else {
+                      _clearTestDisposition();
+                    }
+                  },
+                  selectedColor: AppTheme.gold,
+                  backgroundColor: AppTheme.midnightNavy,
+                  side: const BorderSide(color: AppTheme.gold),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ChoiceChip(
+                label: Text(
+                  'Reset',
+                  style: GoogleFonts.cinzel(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _testDisposition == null
+                        ? AppTheme.bloodRed
+                        : AppTheme.crimson,
+                  ),
+                ),
+                selected: _testDisposition == null,
+                onSelected: (_) => _clearTestDisposition(),
+                selectedColor: AppTheme.crimson,
+                backgroundColor: AppTheme.midnightNavy,
+                side: const BorderSide(color: AppTheme.crimson),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

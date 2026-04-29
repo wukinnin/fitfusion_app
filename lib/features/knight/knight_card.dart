@@ -99,7 +99,7 @@ class _KnightCardState extends State<KnightCard>
             username,
             style: GoogleFonts.cinzel(
               color: AppTheme.gold,
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
           ),

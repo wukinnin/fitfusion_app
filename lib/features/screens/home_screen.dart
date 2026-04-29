@@ -25,7 +25,6 @@ class HomeScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         // Fitness Knight avatar + speech bubble
-                        // (replaces the prior logo + tagline block)
                         if (userId != null)
                           KnightCard(userId: userId)
                         else
@@ -63,13 +62,13 @@ class HomeScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
 
-                        // Leaderboard button
+                        // Performance hub button
                         SizedBox(
                           width: double.infinity,
                           height: 50,
                           child: OutlinedButton(
                             onPressed: () =>
-                                Navigator.pushNamed(context, '/leaderboard'),
+                                Navigator.pushNamed(context, '/performance'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppTheme.gold,
                               side: const BorderSide(
@@ -81,63 +80,7 @@ class HomeScreen extends StatelessWidget {
                               ),
                             ),
                             child: const Text(
-                              'LEADERBOARD',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Achievements button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: OutlinedButton(
-                            onPressed: () =>
-                                Navigator.pushNamed(context, '/achievements'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.gold,
-                              side: const BorderSide(
-                                color: AppTheme.gold,
-                                width: 2,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'ACHIEVEMENTS',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Stats button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: OutlinedButton(
-                            onPressed: () =>
-                                Navigator.pushNamed(context, '/stats'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.gold,
-                              side: const BorderSide(
-                                color: AppTheme.gold,
-                                width: 2,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'STATS',
+                              'PERFORMANCE',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,

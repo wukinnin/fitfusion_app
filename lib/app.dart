@@ -13,6 +13,7 @@ import 'features/screens/auth/verify_email_screen.dart';
 import 'features/screens/game_screen.dart';
 import 'features/screens/home_screen.dart';
 import 'features/screens/leaderboard_screen.dart';
+import 'features/screens/performance_screen.dart';
 import 'features/screens/play/cooldown_select_screen.dart';
 import 'features/screens/play/mode_select_screen.dart';
 import 'features/screens/play/p2_email_screen.dart';
@@ -102,6 +103,7 @@ class _FitFusionAppState extends State<FitFusionApp> {
         '/leaderboard': (context) => const LeaderboardScreen(),
         '/stats': (context) => const StatsScreen(),
         '/achievements': (context) => const AchievementsScreen(),
+        '/performance': (context) => const PerformanceScreen(),
         '/settings': (context) => const SettingsScreen(),
         '/settings/edit-profile': (context) => const EditProfileScreen(),
         '/settings/reset-password': (context) =>

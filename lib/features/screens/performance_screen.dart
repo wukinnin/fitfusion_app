@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/theme.dart';
-import '../../../widgets/fitfusion_animated_background.dart';
-import '../../../widgets/user_profile_footer.dart';
+import '../../core/theme.dart';
+import '../../widgets/fitfusion_animated_background.dart';
+import '../../widgets/user_profile_footer.dart';
 
-/// First step of the play flow — pick Singleplayer or Multiplayer.
-class ModeSelectScreen extends StatelessWidget {
-  const ModeSelectScreen({super.key});
+/// Hub screen for viewing player performance: Leaderboard, Achievements, Stats.
+class PerformanceScreen extends StatelessWidget {
+  const PerformanceScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +20,7 @@ class ModeSelectScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'CHOOSE A MODE',
+          'PERFORMANCE',
           style: GoogleFonts.cinzelDecorative(
             color: AppTheme.gold,
             fontSize: 18,
@@ -41,20 +41,22 @@ class ModeSelectScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _ModeButton(
-                        label: 'SINGLEPLAYER',
-                        onPressed: () => Navigator.pushNamed(
-                          context,
-                          '/select/workout/singleplayer',
-                        ),
+                      _HubButton(
+                        label: 'LEADERBOARD',
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/leaderboard'),
                       ),
                       const SizedBox(height: 20),
-                      _ModeButton(
-                        label: 'MULTIPLAYER',
-                        onPressed: () => Navigator.pushNamed(
-                          context,
-                          '/select/workout/multiplayer',
-                        ),
+                      _HubButton(
+                        label: 'ACHIEVEMENTS',
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/achievements'),
+                      ),
+                      const SizedBox(height: 20),
+                      _HubButton(
+                        label: 'STATS',
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/stats'),
                       ),
                     ],
                   ),
@@ -68,11 +70,11 @@ class ModeSelectScreen extends StatelessWidget {
   }
 }
 
-class _ModeButton extends StatelessWidget {
+class _HubButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
 
-  const _ModeButton({
+  const _HubButton({
     required this.label,
     required this.onPressed,
   });
@@ -87,7 +89,9 @@ class _ModeButton extends StatelessWidget {
           backgroundColor: AppTheme.gold,
           foregroundColor: AppTheme.bloodRed,
           padding: const EdgeInsets.symmetric(vertical: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
         child: Text(
           label,

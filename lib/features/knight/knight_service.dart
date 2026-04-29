@@ -92,12 +92,23 @@ class KnightService {
   }
 
   // ---------------------------------------------------------------------------
+  // Test override (in-memory only — resets on app restart)
+  // ---------------------------------------------------------------------------
+
+  static KnightDisposition? _testOverride;
+
+  static void setTestOverride(KnightDisposition d) => _testOverride = d;
+  static void clearTestOverride() => _testOverride = null;
+  static KnightDisposition? getTestOverride() => _testOverride;
+
+  // ---------------------------------------------------------------------------
   // Disposition evaluation
   // ---------------------------------------------------------------------------
 
   /// Evaluates the current disposition for [userId]. A brand-new user (no
   /// stamps yet) returns Praise as a welcoming default.
   static Future<KnightDisposition> evaluate(String userId) async {
+    if (_testOverride != null) return _testOverride!;
     final lastSession = await getLastSession(userId);
     final lastAppOpen = await getLastAppOpen(userId);
     return projectDisposition(

@@ -110,6 +110,39 @@ class NotificationService {
     }());
   }
 
+  /// Sends an immediate test notification (not scheduled) using the given
+  /// [disposition]. Uses the same title/body format as the real daily pings.
+  Future<void> sendTestNotification(KnightDisposition disposition) async {
+    if (!_initialized) await initialize();
+
+    final line = KnightService.pickRandomLine(disposition);
+    final title = _titleFor(disposition);
+
+    const androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDesc,
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+      icon: '@mipmap/ic_launcher',
+    );
+    const details = NotificationDetails(android: androidDetails);
+
+    await _plugin.show(
+      9999, // Test notification ID
+      title,
+      line,
+      details,
+    );
+
+    assert(() {
+      debugPrint(
+        '[NotificationService] Test notification sent: $title — $line',
+      );
+      return true;
+    }());
+  }
+
   Future<void> cancelAll() async {
     if (!_initialized) await initialize();
     await _plugin.cancelAll();
