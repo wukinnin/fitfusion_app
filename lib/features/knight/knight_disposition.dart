@@ -1,22 +1,48 @@
-/// The Fitness Knight's disposition toward the player, derived from
-/// recent activity timestamps. Higher = better disposition.
+/// The Fitness Knight's disposition toward the player, derived from a
+/// 12h-window session count and the recency of the last app-open.
+///
+/// Tiers (highest → lowest engagement):
+///   1. [veryActive]        — ≥2 qualifying sessions in last 12h.
+///   2. [somewhatActive]    — ≥1 qualifying session in last 24h.
+///   3. [neutral]           — last app-open ≤ 48h, no qualifying session.
+///   4. [somewhatInactive]  — last app-open age in (48h, 72h].
+///   5. [veryInactive]      — last app-open age > 72h (or no data).
 enum KnightDisposition {
-  praise,
-  questioned,
-  concerned,
-  inactive;
+  veryActive,
+  somewhatActive,
+  neutral,
+  somewhatInactive,
+  veryInactive;
 
   /// Path to the knight portrait asset for this disposition.
   String get assetPath {
     switch (this) {
-      case KnightDisposition.praise:
-        return 'assets/images/knight/knight-praise.png';
-      case KnightDisposition.questioned:
-        return 'assets/images/knight/knight-questioned.png';
-      case KnightDisposition.concerned:
-        return 'assets/images/knight/knight-concerned.png';
-      case KnightDisposition.inactive:
-        return 'assets/images/knight/knight-inactive.png';
+      case KnightDisposition.veryActive:
+        return 'assets/images/knight/1-very-active.png';
+      case KnightDisposition.somewhatActive:
+        return 'assets/images/knight/2-somewhat-active.png';
+      case KnightDisposition.neutral:
+        return 'assets/images/knight/3-neutral.png';
+      case KnightDisposition.somewhatInactive:
+        return 'assets/images/knight/4-somewhat-inactive.png';
+      case KnightDisposition.veryInactive:
+        return 'assets/images/knight/5-very-inactive.png';
+    }
+  }
+
+  /// Human-readable label for chips / debug UI (e.g. "Very Active").
+  String get displayName {
+    switch (this) {
+      case KnightDisposition.veryActive:
+        return 'Very Active';
+      case KnightDisposition.somewhatActive:
+        return 'Somewhat Active';
+      case KnightDisposition.neutral:
+        return 'Neutral';
+      case KnightDisposition.somewhatInactive:
+        return 'Somewhat Inactive';
+      case KnightDisposition.veryInactive:
+        return 'Very Inactive';
     }
   }
 
@@ -24,38 +50,45 @@ enum KnightDisposition {
   /// selected on each home-screen build (or at notification scheduling time).
   List<String> get lines {
     switch (this) {
-      case KnightDisposition.praise:
+      case KnightDisposition.veryActive:
         return const [
-          'My armor is glowing from your gains! ✨🛡️',
-          'Is it getting hot in here, or is that just your fire? 🥵',
-          'Even the dragons are starting to look small to me. 🐉🤏',
-          'A sharpened blade never rusts. Good work, squire. ⚔️',
-          'Slow and steady wins the siege. Keep pushing. 🐢🏰',
-          'Consistency: The secret weapon of every hero. 🛡️✅',
+          'We came, we saw, we conquered. Next? ⚔️',
+          'Welcome, warrior! Ready to conquer today\u2019s quests? 🛡️',
+          'Your strength grows with every battle. 💪',
+          'Another victory awaits — shall we begin? 🎖️',
+          'Even the dragons are starting to look small to me. 🤏',
         ];
-      case KnightDisposition.questioned:
+      case KnightDisposition.somewhatActive:
         return const [
-          'You\u2019ve opened the app a few times. My cardio is fine—how\u2019s yours? 🙄',
-          'Are we here to sweat, or are we here to window shop? 💅',
-          'I\u2019ve been standing by for three hours. My back hurts. 🧘‍♂️💢',
-          'The gains don\'t make themselves while you scroll, friend. 🏋️‍♂️📱',
-          'My grandmother swings a mace faster than you log a set. 👵💥',
+          'Another day at the office. Let\u2019s get to work. 💼',
+          'Ah, you\u2019ve returned. A fine day for adventure. 🏞️',
+          'The kingdom is glad to see you again. �',
+          'Let us continue where we left off. ⚔️',
+          'A sharpened blade never rusts. �️',
         ];
-      case KnightDisposition.concerned:
+      case KnightDisposition.neutral:
         return const [
-          'My adventures are lonely without your spirit. 🕯️',
-          'I\u2019m thinking of auditioning for a new user. One with sneakers. 👟',
+          'Standing by\u2026 awaiting your command. 🧍',
+          'I\u2019ve been standing by for three hours. My back hurts. 🧘‍♂️',
+          'The battlefield is quiet\u2026 for now. 🤫',
+          'You\u2019ve opened the app a few times. My cardio is fine. You? 🫀',
+          'The gains don\'t make themselves while you scroll, friend. �',
+        ];
+      case KnightDisposition.somewhatInactive:
+        return const [
+          'I was starting to think you got eaten by that dragon. �',
           'Consistency is the truest armor. Don\'t let yours rust. 🛡️',
           'Your muscles are whispering my name. They miss me. 🥺',
-          'Did a dragon get you? Blink twice if you\u2019re trapped in a cave. 🐉',
+          'The flames of battle grow dim without you. 🕯️',
+          'Have you abandoned this quest, warrior? �',
         ];
-      case KnightDisposition.inactive:
+      case KnightDisposition.veryInactive:
         return const [
-          'I am eating my own leather boots for sustenance. 👢💀',
-          'Dust. So much dust. I think a spider lives in my helmet now. 🕷️',
+          'Even the strongest knights must rest\u2026 you now, in peace. 🪦',
+          'Will you rise again\u2026 or shall the story end here? �',
           'Is anyone there? Or am I just a nobody to you? 🌫️📱',
-          'Is this... the end of our quest? I\'ll wait by the gate. 🏚️',
-          'I\u2019ve forgotten the sound of a heartbeat. 💓❓',
+          'Is this\u2026 the end of our quest? I\'ll wait by the gate. 🏚️',
+          'I\u2019ve forgotten the sound of a heartbeat. 💓',
         ];
     }
   }

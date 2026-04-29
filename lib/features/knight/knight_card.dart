@@ -62,8 +62,17 @@ class _KnightCardState extends State<KnightCard>
           // it forces a fresh evaluate() call and a freshly-rolled line.
           future: KnightService.evaluate(widget.userId),
           builder: (context, snapshot) {
-            final disposition = snapshot.data ?? KnightDisposition.praise;
-            final line = KnightService.pickRandomLine(disposition);
+            final disposition = snapshot.data ?? KnightDisposition.veryActive;
+            // Mirror the most recently-fired notification: pick the line
+            // deterministically from (disposition, today's date, current
+            // slot) so the bubble shows the exact text the user just got
+            // pushed (and vice-versa).
+            final slotInfo = KnightService.currentSlotFor(DateTime.now());
+            final line = KnightService.pickLineFor(
+              disposition: disposition,
+              dateLocal: slotInfo.date,
+              slot: slotInfo.slot,
+            );
             return FutureBuilder<String?>(
               future: _fetchUsername(),
               builder: (context, usernameSnapshot) {

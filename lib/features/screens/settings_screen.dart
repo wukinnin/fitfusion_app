@@ -339,13 +339,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleTestNotification() async {
-    final disposition = _testDisposition ?? KnightDisposition.praise;
+    final disposition = _testDisposition ?? KnightDisposition.veryActive;
     await NotificationService.instance.sendTestNotification(disposition);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Test notification sent (${disposition.name})',
+            'Test notification sent (${disposition.displayName})',
             style: GoogleFonts.cinzel(color: AppTheme.creamWhite),
           ),
         ),
@@ -381,7 +381,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               for (final d in dispositions)
                 ChoiceChip(
                   label: Text(
-                    d.name[0].toUpperCase() + d.name.substring(1),
+                    d.displayName,
                     style: GoogleFonts.cinzel(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,

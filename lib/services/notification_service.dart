@@ -32,8 +32,10 @@ class NotificationService {
       'Daily reminders from your Fitness Knight.';
 
   /// Local-time hours at which the morning and evening pings fire.
-  static const int kMorningHour = 8;
-  static const int kEveningHour = 19;
+  /// These are re-exported from KnightService so the in-app dialogue
+  /// picker and the scheduler agree on the slot boundaries.
+  static const int kMorningHour = KnightService.kMorningHour;
+  static const int kEveningHour = KnightService.kEveningHour;
   static const int kSlotMinute = 0;
 
   /// How many days out to pre-schedule (today + next N).
@@ -96,8 +98,8 @@ class NotificationService {
 
     await cancelAll();
 
-    final lastSession = await KnightService.getLastSession(userId);
     final lastAppOpen = await KnightService.getLastAppOpen(userId);
+    final recentSessions = await KnightService.getRecentSessions(userId);
 
     final nowLocal = tz.TZDateTime.now(tz.local);
     final engagedToday =
@@ -108,20 +110,24 @@ class NotificationService {
 
     for (int dayOffset = 0; dayOffset <= kHorizonDays; dayOffset++) {
       final isToday = dayOffset == 0;
-      final morning = _slotAt(nowLocal, dayOffset, _PingSlot.morning);
-      final evening = _slotAt(nowLocal, dayOffset, _PingSlot.evening);
+      final morning = _slotAt(nowLocal, dayOffset, KnightPingSlot.morning);
+      final evening = _slotAt(nowLocal, dayOffset, KnightPingSlot.evening);
 
       // ---- Morning slot --------------------------------------------------
       if (morning.isAfter(nowLocal)) {
         final projected = KnightService.projectDisposition(
           now: morning.toUtc(),
-          lastSession: lastSession,
           lastAppOpen: lastAppOpen,
+          recentSessions: recentSessions,
         );
         await _scheduleOne(
           id: _morningIdBase + dayOffset,
-          title: _titleFor(projected, _PingSlot.morning),
-          body: KnightService.pickRandomLine(projected),
+          title: _titleFor(projected, KnightPingSlot.morning),
+          body: KnightService.pickLineFor(
+            disposition: projected,
+            dateLocal: morning,
+            slot: KnightPingSlot.morning,
+          ),
           when: morning,
         );
         scheduled++;
@@ -136,13 +142,17 @@ class NotificationService {
       } else {
         final projected = KnightService.projectDisposition(
           now: evening.toUtc(),
-          lastSession: lastSession,
           lastAppOpen: lastAppOpen,
+          recentSessions: recentSessions,
         );
         await _scheduleOne(
           id: _eveningIdBase + dayOffset,
-          title: _titleFor(projected, _PingSlot.evening),
-          body: KnightService.pickRandomLine(projected),
+          title: _titleFor(projected, KnightPingSlot.evening),
+          body: KnightService.pickLineFor(
+            disposition: projected,
+            dateLocal: evening,
+            slot: KnightPingSlot.evening,
+          ),
           when: evening,
         );
         scheduled++;
@@ -159,12 +169,20 @@ class NotificationService {
   }
 
   /// Sends an immediate test notification (not scheduled) using the given
-  /// [disposition]. Uses the same title/body format as the real daily pings.
+  /// [disposition]. Uses the same title/body format as the real daily
+  /// pings — including the deterministic slot-based line picker, so the
+  /// test notification matches what the home-screen bubble currently
+  /// shows for that disposition.
   Future<void> sendTestNotification(KnightDisposition disposition) async {
     if (!_initialized) await initialize();
 
-    final line = KnightService.pickRandomLine(disposition);
-    final title = _titleFor(disposition, _PingSlot.morning);
+    final slotInfo = KnightService.currentSlotFor(DateTime.now());
+    final line = KnightService.pickLineFor(
+      disposition: disposition,
+      dateLocal: slotInfo.date,
+      slot: slotInfo.slot,
+    );
+    final title = _titleFor(disposition, slotInfo.slot);
 
     const androidDetails = AndroidNotificationDetails(
       _channelId,
@@ -207,9 +225,10 @@ class NotificationService {
   tz.TZDateTime _slotAt(
     tz.TZDateTime nowLocal,
     int dayOffset,
-    _PingSlot slot,
+    KnightPingSlot slot,
   ) {
-    final hour = slot == _PingSlot.morning ? kMorningHour : kEveningHour;
+    final hour =
+        slot == KnightPingSlot.morning ? kMorningHour : kEveningHour;
     final base = tz.TZDateTime(
       tz.local,
       nowLocal.year,
@@ -256,34 +275,34 @@ class NotificationService {
     );
   }
 
-  String _titleFor(KnightDisposition disposition, _PingSlot slot) {
-    if (slot == _PingSlot.morning) {
+  String _titleFor(KnightDisposition disposition, KnightPingSlot slot) {
+    if (slot == KnightPingSlot.morning) {
       switch (disposition) {
-        case KnightDisposition.praise:
+        case KnightDisposition.veryActive:
           return 'Your Knight salutes you ⚔️';
-        case KnightDisposition.questioned:
+        case KnightDisposition.somewhatActive:
+          return 'Your Knight stands ready 🛡️';
+        case KnightDisposition.neutral:
           return 'Your Knight is waiting...';
-        case KnightDisposition.concerned:
-          return 'Your Knight is worried';
-        case KnightDisposition.inactive:
+        case KnightDisposition.somewhatInactive:
+          return 'Your Knight grows uneasy';
+        case KnightDisposition.veryInactive:
           return 'Your Knight has gone quiet';
       }
     }
     // Evening — "calls again" framing so users can distinguish back-to-back
     // notifications at a glance.
     switch (disposition) {
-      case KnightDisposition.praise:
+      case KnightDisposition.veryActive:
         return 'Your Knight raises a toast 🍻';
-      case KnightDisposition.questioned:
+      case KnightDisposition.somewhatActive:
+        return 'Your Knight calls again ⚔️';
+      case KnightDisposition.neutral:
         return 'Your Knight calls again...';
-      case KnightDisposition.concerned:
-        return 'Your Knight grows uneasy';
-      case KnightDisposition.inactive:
+      case KnightDisposition.somewhatInactive:
+        return 'Your Knight broods alone';
+      case KnightDisposition.veryInactive:
         return 'Your Knight stands alone';
     }
   }
 }
-
-/// Internal marker for which daily slot a notification belongs to. Kept
-/// private to the service so callers don't need to think about it.
-enum _PingSlot { morning, evening }
