@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../widgets/fitfusion_animated_background.dart';
-import '../../widgets/user_profile_footer.dart';
 import '../knight/knight_card.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -18,7 +17,6 @@ class HomeScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              const UserProfileFooter(),
               Expanded(
                 child: Center(
                   child: Padding(

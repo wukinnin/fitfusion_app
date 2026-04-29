@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import 'knight_disposition.dart';
@@ -55,24 +56,54 @@ class _KnightCardState extends State<KnightCard>
       builder: (context, snapshot) {
         final disposition = snapshot.data ?? KnightDisposition.praise;
         final line = KnightService.pickRandomLine(disposition);
-        return FadeTransition(
-          opacity: _fade,
-          child: SlideTransition(
-            position: _slide,
-            child: _buildCard(disposition, line),
-          ),
+        return FutureBuilder<String?>(
+          future: _fetchUsername(),
+          builder: (context, usernameSnapshot) {
+            return FadeTransition(
+              opacity: _fade,
+              child: SlideTransition(
+                position: _slide,
+                child: _buildCard(disposition, line, usernameSnapshot.data),
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildCard(KnightDisposition disposition, String line) {
+  Future<String?> _fetchUsername() async {
+    final client = Supabase.instance.client;
+    try {
+      final row = await client
+          .from('users')
+          .select('username')
+          .eq('id', widget.userId)
+          .maybeSingle();
+      return row?['username'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _buildCard(KnightDisposition disposition, String line, String? username) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         _SpeechBubble(line: line),
         const SizedBox(height: 8),
         _AvatarCircle(assetPath: disposition.assetPath),
+        if (username != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            username,
+            style: GoogleFonts.cinzel(
+              color: AppTheme.gold,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -168,30 +199,13 @@ class _AvatarCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const double size = 120;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppTheme.midnightNavy,
-        border: Border.all(color: AppTheme.gold, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.gold.withValues(alpha: 0.25),
-            blurRadius: 16,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: ClipOval(
-        child: Image.asset(
-          assetPath,
-          fit: BoxFit.cover,
-          cacheWidth: 360,
-          cacheHeight: 360,
-        ),
-      ),
+    return Image.asset(
+      assetPath,
+      width: 150,
+      height: 150,
+      fit: BoxFit.contain,
+      cacheWidth: 450,
+      cacheHeight: 450,
     );
   }
 }
