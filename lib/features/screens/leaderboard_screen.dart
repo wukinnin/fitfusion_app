@@ -22,23 +22,34 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   final Map<int, int> _workoutMetricIndex = {0: 0, 1: 0, 2: 0};
   // Lifetime metric index: 0 = Total Reps, 1 = Total Victories
   int _lifetimeMetricIndex = 0;
+  // Session-mode index for the per-workout tabs only:
+  //   0 = Singleplayer (default), 1 = Multiplayer.
+  // The Lifetime tab ignores this — totals are user-scoped regardless of mode.
+  int _modeIndex = 0;
 
   static const _workoutTabs = ['Squats', 'Jacks', 'Crunches', 'Lifetime'];
   static const _workoutMetrics = ['Clear Time', 'Best Rep Interval'];
   static const _lifetimeMetrics = ['Total Reps', 'Total Victories'];
+  static const _modes = ['Singleplayer', 'Multiplayer'];
   static const _workoutDbKeys = ['squats', 'jumping_jacks', 'side_crunches'];
 
   bool _loading = true;
 
-  // Cached leaderboard data: [tabIndex][metricIndex] → list of {rank, username, value}
-  // Workout tabs: 3 tabs × 2 metrics each
-  // Lifetime tab: 1 tab × 2 metrics
+  // Cached leaderboard data, keyed by `'$tab:$metric:$mode'`.
+  //   - Singleplayer rows: {rank, username, value}
+  //   - Multiplayer rows: {rank, username_a, username_b, value}
+  // Workout tabs: 3 tabs × 2 metrics × 2 modes
+  // Lifetime tab: 1 tab × 2 metrics (mode dimension always 0)
   final Map<String, List<Map<String, dynamic>>> _cache = {};
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    // Rebuild on tab change so the SP/MP toggle hides on the Lifetime tab.
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _fetchAll();
   }
 
@@ -48,7 +59,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     super.dispose();
   }
 
-  String _cacheKey(int tab, int metric) => '$tab:$metric';
+  String _cacheKey(int tab, int metric, [int mode = 0]) =>
+      '$tab:$metric:$mode';
 
   Future<void> _fetchAll() async {
     try {
@@ -61,28 +73,33 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       for (int tab = 0; tab < 3; tab++) {
         final dbKey = _workoutDbKeys[tab];
 
-        // Clear time (metric 0)
+        // Clear time (metric 0) — singleplayer
         final ctEntries =
             (clearTimeRows as List)
                 .where((r) => r['workout_type'] == dbKey)
                 .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
                 .toList()
               ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
-        _cache[_cacheKey(tab, 0)] = ctEntries;
+        _cache[_cacheKey(tab, 0, 0)] = ctEntries;
 
-        // Best rep interval (metric 1)
+        // Best rep interval (metric 1) — singleplayer
         final riEntries =
             (repIntervalRows as List)
                 .where((r) => r['workout_type'] == dbKey)
                 .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
                 .toList()
               ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
-        _cache[_cacheKey(tab, 1)] = riEntries;
+        _cache[_cacheKey(tab, 1, 0)] = riEntries;
+
+        // Multiplayer caches stay empty until the backend pipeline lands.
+        // Placeholder rows render automatically when these are missing.
+        // TODO(multiplayer-leaderboard): populate _cache[_cacheKey(tab, 0, 1)]
+        // and _cache[_cacheKey(tab, 1, 1)] from the multiplayer-aware view.
       }
 
       // Fetch lifetime leaderboards
       final repsRows = await _client.from('v_top10_lifetime_reps').select();
-      _cache[_cacheKey(3, 0)] = List<Map<String, dynamic>>.from(
+      _cache[_cacheKey(3, 0, 0)] = List<Map<String, dynamic>>.from(
         (repsRows as List)
           ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int)),
       );
@@ -90,7 +107,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       final victoriesRows = await _client
           .from('v_top10_lifetime_victories')
           .select();
-      _cache[_cacheKey(3, 1)] = List<Map<String, dynamic>>.from(
+      _cache[_cacheKey(3, 1, 0)] = List<Map<String, dynamic>>.from(
         (victoriesRows as List)
           ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int)),
       );
@@ -157,6 +174,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         child: Column(
           children: [
             const UserProfileFooter(),
+            // Session-mode toggle (SP / MP). Hidden on the Lifetime tab —
+            // lifetime totals are user-scoped and don't differ by mode.
+            if (_tabController.index != 3) ...[
+              const SizedBox(height: 12),
+              _buildModeSelector(),
+            ],
             Expanded(
               child: _loading
                   ? const Center(
@@ -180,9 +203,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   Widget _buildWorkoutTab(int tabIndex) {
     final selectedMetric = _workoutMetricIndex[tabIndex] ?? 0;
-    final entries = _cache[_cacheKey(tabIndex, selectedMetric)] ?? [];
+    final entries =
+        _cache[_cacheKey(tabIndex, selectedMetric, _modeIndex)] ?? [];
     // Clear time and rep interval are both "lower is better" formatted as time/seconds
     final isTime = selectedMetric == 0;
+    final isMultiplayer = _modeIndex == 1;
     return Column(
       children: [
         const SizedBox(height: 12),
@@ -193,14 +218,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: _buildLeaderboardTable(entries: entries, isTime: isTime),
+          child: _buildLeaderboardTable(
+            entries: entries,
+            isTime: isTime,
+            isMultiplayer: isMultiplayer,
+          ),
         ),
       ],
     );
   }
 
   Widget _buildLifetimeTab() {
-    final entries = _cache[_cacheKey(3, _lifetimeMetricIndex)] ?? [];
+    final entries = _cache[_cacheKey(3, _lifetimeMetricIndex, 0)] ?? [];
     return Column(
       children: [
         const SizedBox(height: 12),
@@ -211,9 +240,76 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: _buildLeaderboardTable(entries: entries, isTime: false),
+          child: _buildLeaderboardTable(
+            entries: entries,
+            isTime: false,
+            isMultiplayer: false,
+          ),
         ),
       ],
+    );
+  }
+
+  /// Singleplayer / Multiplayer pill switcher. Slightly larger and bolder
+  /// than the per-tab metric selector so it reads as a higher-tier filter.
+  Widget _buildModeSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: List.generate(_modes.length, (i) {
+          final isSelected = i == _modeIndex;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _modeIndex = i),
+              child: Container(
+                margin: EdgeInsets.only(
+                  left: i == 0 ? 0 : 6,
+                  right: i == _modes.length - 1 ? 0 : 6,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppTheme.gold.withValues(alpha: 0.22)
+                      : Colors.black.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppTheme.gold
+                        : AppTheme.gold.withValues(alpha: 0.35),
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      i == 0 ? Icons.person : Icons.group,
+                      size: 16,
+                      color: isSelected
+                          ? AppTheme.gold
+                          : AppTheme.creamWhite.withValues(alpha: 0.55),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _modes[i].toUpperCase(),
+                      style: GoogleFonts.cinzel(
+                        color: isSelected
+                            ? AppTheme.gold
+                            : AppTheme.creamWhite.withValues(alpha: 0.55),
+                        fontSize: 12,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
     );
   }
 
@@ -268,6 +364,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   Widget _buildLeaderboardTable({
     required List<Map<String, dynamic>> entries,
     required bool isTime,
+    required bool isMultiplayer,
   }) {
     final itemCount = entries.isEmpty ? 10 : entries.length;
     return ListView.builder(
@@ -276,10 +373,23 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       itemBuilder: (context, i) {
         final hasData = i < entries.length;
         final rank = hasData ? entries[i]['rank'] : i + 1;
-        final username = hasData ? (entries[i]['username'] ?? '--') : '--';
         final value = hasData
             ? _formatValue(entries[i]['value'], isTime: isTime)
             : '--';
+
+        // Username display:
+        //   - Singleplayer: just `username`
+        //   - Multiplayer:  `[A] and [B]` — both required, fallback '--' each.
+        final String displayName;
+        if (isMultiplayer) {
+          final a = hasData
+              ? (entries[i]['username_a'] ?? entries[i]['username'] ?? '--')
+              : '--';
+          final b = hasData ? (entries[i]['username_b'] ?? '--') : '--';
+          displayName = '[$a] and [$b]';
+        } else {
+          displayName = hasData ? (entries[i]['username'] ?? '--') : '--';
+        }
 
         return Container(
           margin: const EdgeInsets.only(bottom: 6),
@@ -311,15 +421,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '$username',
+                  displayName,
                   style: TextStyle(
                     color: hasData
                         ? AppTheme.creamWhite
                         : AppTheme.creamWhite.withValues(alpha: 0.4),
-                    fontSize: 15,
+                    fontSize: isMultiplayer ? 13 : 15,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 value,
                 style: TextStyle(

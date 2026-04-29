@@ -201,11 +201,9 @@ class _AvatarCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Image.asset(
       assetPath,
-      width: 150,
-      height: 150,
+      width: 300,
       fit: BoxFit.contain,
-      cacheWidth: 450,
-      cacheHeight: 450,
+      cacheWidth: 900,
     );
   }
 }
