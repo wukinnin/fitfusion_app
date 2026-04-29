@@ -81,13 +81,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleLogOut() async {
-    // Cancel any pending Knight pings so the next user (or this user upon
-    // re-login) gets a fresh batch.
-    await NotificationService.instance.cancelAll();
-    await _client.auth.signOut();
+    // Local-scope sign-out: clears the on-device session synchronously and
+    // does NOT make a network round-trip to revoke server-side. Using the
+    // default (global) scope means the call hangs for the full HTTP
+    // timeout on flaky / offline networks, making the button feel dead.
+    try {
+      await _client.auth.signOut(scope: SignOutScope.local);
+    } catch (e) {
+      assert(() {
+        debugPrint('[SettingsScreen] signOut failed: $e');
+        return true;
+      }());
+    }
+
     // Wipe the cached username/email so the welcome/login screens don't
     // briefly flash the previous user's header.
     UserService.clear();
+
+    // Fire-and-forget: cancelling pending Knight pings shouldn't block
+    // navigation. The plugin lazy-initializes on first use, which can
+    // take a noticeable beat on cold platform channels.
+    // ignore: unawaited_futures
+    NotificationService.instance.cancelAll();
+
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
     }
