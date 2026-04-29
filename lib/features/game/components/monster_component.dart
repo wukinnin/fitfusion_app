@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
@@ -7,25 +5,16 @@ import '../fitfusion_game.dart';
 
 class MonsterComponent extends PositionComponent
     with HasGameReference<FitFusionGame> {
-  static const double displayWidth = 96;
-  static const double displayHeight = 144;
-  static const List<String> monsterFiles = [
-    'monsters/monster_01.png',
-    'monsters/monster_02.png',
-    'monsters/monster_03.png',
-    'monsters/monster_04.png',
-    'monsters/monster_05.png',
-    'monsters/monster_06.png',
-    'monsters/monster_07.png',
-    'monsters/monster_08.png',
-    'monsters/monster_09.png',
-    'monsters/monster_10.png',
-  ];
+  static const double layoutWidth = 96;
+  static const double displayWidth = 231.84;
+  static const double displayHeight = 206.08;
+  static const double frameWidth = 144;
+  static const double frameHeight = 128;
+  static const String dragonFile =
+      'game/flying_twin_headed_dragon-red-spritesheet-144x128.png';
+  static const List<String> monsterFiles = [dragonFile];
 
-  late final List<int> _shuffledOrder;
-  final List<Sprite> _sprites = [];
-  int _monsterIndex = 0;
-  late final SpriteComponent _spriteComp;
+  late final SpriteAnimationComponent _dragon;
 
   // White flash overlay for hit animation
   final _flashPaint = Paint()
@@ -35,34 +24,31 @@ class MonsterComponent extends PositionComponent
   double _flashTimer = 0;
   static const double _flashDuration = 0.12;
 
+  double get visualWidth => displayWidth * scale.x;
+  double get visualHeight => displayHeight * scale.y;
+
   @override
   Future<void> onLoad() async {
     size = Vector2(displayWidth, displayHeight);
 
-    // Shuffle monster order — no repetition linearly
-    _shuffledOrder = List.generate(monsterFiles.length, (i) => i);
-    _shuffledOrder.shuffle(Random());
-    _monsterIndex = 0;
-
-    final images = await Future.wait(monsterFiles.map(game.images.load));
-    _sprites.addAll(images.map(Sprite.new));
-
-    _spriteComp = SpriteComponent(
-      sprite: _sprites[_shuffledOrder[_monsterIndex]],
-      size: Vector2(displayWidth, displayHeight),
+    final image = await game.images.load(dragonFile);
+    _dragon = SpriteAnimationComponent(
+      animation: SpriteAnimation.fromFrameData(
+        image,
+        SpriteAnimationData.sequenced(
+          amount: 3,
+          stepTime: 0.12,
+          textureSize: Vector2(frameWidth, frameHeight),
+        ),
+      ),
+      size: size,
     );
-    add(_spriteComp);
+    add(_dragon);
   }
 
-  void _loadCurrentMonster() {
-    _spriteComp.sprite =
-        _sprites[_shuffledOrder[_monsterIndex % _sprites.length]];
-  }
+  void nextMonster() {}
 
-  void nextMonster() {
-    _monsterIndex++;
-    _loadCurrentMonster();
-  }
+  void setLifeStealScale(double multiplier) => scale = Vector2.all(multiplier);
 
   void flashHit() {
     _isFlashing = true;

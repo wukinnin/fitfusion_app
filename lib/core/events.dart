@@ -12,8 +12,8 @@ class PaceEvent {
   final PaceEventType type;
 
   /// Seconds elapsed between the last rep and this event.
-  /// For repOnTime: the actual interval (will be < kPaceThresholdSeconds).
-  /// For paceFailed: equals kPaceThresholdSeconds exactly.
+  /// For repOnTime: the actual interval (will be < configured pace interval).
+  /// For paceFailed: equals the configured pace interval exactly.
   final double intervalSeconds;
 
   final DateTime timestamp;

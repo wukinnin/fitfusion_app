@@ -10,12 +10,23 @@ class PaceMonitor {
   bool _isActive = false;
   bool _isDisposed = false;
   Future<void>? _disposeFuture;
+  double _paceIntervalSeconds = kPaceThresholdSeconds;
 
   final StreamController<PaceEvent> _paceController =
       StreamController<PaceEvent>.broadcast();
 
   Stream<PaceEvent> get paceStream => _paceController.stream;
   bool get isActive => _isActive;
+
+  void configure({required double paceIntervalSeconds}) {
+    if (_isDisposed) return;
+    _paceIntervalSeconds = paceIntervalSeconds > 0
+        ? paceIntervalSeconds
+        : kPaceThresholdSeconds;
+    if (_isActive) {
+      _resetTimer();
+    }
+  }
 
   /// Call this when the FIRST REP of a round is detected.
   /// This starts the pace timer. Do not call this before the first rep
@@ -72,7 +83,7 @@ class PaceMonitor {
   void _resetTimer() {
     _paceTimer?.cancel();
     _paceTimer = Timer(
-      Duration(milliseconds: (kPaceThresholdSeconds * 1000).round()),
+      Duration(milliseconds: (_paceIntervalSeconds * 1000).round()),
       _onPaceViolation,
     );
   }
@@ -83,7 +94,7 @@ class PaceMonitor {
 
     assert(() {
       debugPrint(
-        '[PaceMonitor] PACE VIOLATION — no rep in ${kPaceThresholdSeconds}s',
+        '[PaceMonitor] PACE VIOLATION — no rep in ${_paceIntervalSeconds}s',
       );
       return true;
     }());
@@ -92,7 +103,7 @@ class PaceMonitor {
       _paceController.add(
         PaceEvent(
           type: PaceEventType.paceFailed,
-          intervalSeconds: kPaceThresholdSeconds,
+          intervalSeconds: _paceIntervalSeconds,
           timestamp: DateTime.now(),
         ),
       );

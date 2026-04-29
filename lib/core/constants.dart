@@ -3,10 +3,17 @@ const int kTotalRounds = 10;
 const int kStartingLives = 3;
 const double kPaceThresholdSeconds = 5.0;
 const int kCooldownSeconds = 15;
+const int kTotalSessionReps = 91;
+const double kDragonLifeStealScaleBonus = 0.20;
 
-// Rep formula — repsRequired(round) = round + 1
 // round is 1-indexed (1 through 10)
-int repsRequiredForRound(int round) => round + 1;
+int repsRequiredForRound(int round) {
+  if (round <= 5) return 8;
+  if (round <= 7) return 9;
+  if (round == 8) return 10;
+  if (round == 9) return 11;
+  return 12;
+}
 
 // Camera / ML Kit Performance
 const int kFrameSkipCount = 2; // process every Nth frame from the camera

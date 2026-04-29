@@ -5,7 +5,6 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/constants.dart';
 import '../../../core/enums.dart';
 import '../fitfusion_game.dart';
 
@@ -46,11 +45,12 @@ class CooldownOverlay extends PositionComponent
     fontWeight: FontWeight.bold,
     shadows: const [Shadow(blurRadius: 4, color: Colors.black)],
   );
-  late final List<TextPainter> _countdownPainters;
+  List<TextPainter> _countdownPainters = [];
 
   _CooldownPhase _phase = _CooldownPhase.slideIn;
   double _phaseTimer = 0;
-  double _countdownRemaining = kCooldownSeconds.toDouble();
+  int _cooldownSeconds = 15;
+  double _countdownRemaining = 15;
   int _nextRound = 1;
   bool _isActive = false;
   bool _roundTextDirty = true;
@@ -88,7 +88,9 @@ class CooldownOverlay extends PositionComponent
     _imageLayoutDirty = true;
     _phase = _CooldownPhase.slideIn;
     _phaseTimer = 0;
-    _countdownRemaining = kCooldownSeconds.toDouble();
+    _cooldownSeconds = game.cooldownSeconds.clamp(2, 30).toInt();
+    _ensureCountdownPainters();
+    _countdownRemaining = _cooldownSeconds.toDouble();
     _isActive = true;
   }
 
@@ -112,7 +114,13 @@ class CooldownOverlay extends PositionComponent
       'game/side-crunches.png',
     );
 
-    _countdownPainters = List.generate(kCooldownSeconds + 1, (seconds) {
+    _cooldownSeconds = game.cooldownSeconds.clamp(2, 30).toInt();
+    _ensureCountdownPainters();
+  }
+
+  void _ensureCountdownPainters() {
+    if (_countdownPainters.length == _cooldownSeconds + 1) return;
+    _countdownPainters = List.generate(_cooldownSeconds + 1, (seconds) {
       return TextPainter(
         text: TextSpan(text: '$seconds', style: _countStyle),
         textDirection: TextDirection.ltr,
@@ -207,7 +215,7 @@ class CooldownOverlay extends PositionComponent
     final centerY = _timerCenter.dy;
 
     // Countdown progress fraction
-    final fraction = _countdownRemaining / kCooldownSeconds;
+    final fraction = _countdownRemaining / _cooldownSeconds;
 
     // Pie-chart countdown
     canvas.drawArc(
@@ -224,7 +232,7 @@ class CooldownOverlay extends PositionComponent
     // Countdown number
     final seconds = _countdownRemaining.ceil();
     final countTp =
-        _countdownPainters[seconds.clamp(0, kCooldownSeconds).toInt()];
+        _countdownPainters[seconds.clamp(0, _cooldownSeconds).toInt()];
     countTp.paint(
       canvas,
       Offset(centerX - countTp.width / 2, centerY - countTp.height / 2),

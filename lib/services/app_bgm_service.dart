@@ -16,7 +16,8 @@ bool shouldPlayMenuForRoute(String? routeName) {
     '/auth', // Welcome / auth landing
     '/auth/login',
     '/auth/signup',
-    '/game', // Game proper owns its own soundtrack.
+    '/game', // Game proper is BGM-silent; gameplay SFX still play.
+    '/results', // Results is fully silent.
   };
 
   return !silentRoutes.contains(routeName);
@@ -62,11 +63,12 @@ class AppBgmService {
   static const List<String> _preloadAudio = [
     _menuTrack,
     'sfx/achievement.mp3',
+    'sfx/slash.mp3',
+    'sfx/thud.mp3',
+    'sfx/damage.mp3',
     'sfx/win_violin.mp3',
     'sfx/victory_orchestra.mp3',
-    'sfx/thud.mp3',
     'sfx/lose_violin.mp3',
-    'sfx/damage.mp3',
   ];
   static const String _volumePreferenceKey = 'global_audio_volume';
 

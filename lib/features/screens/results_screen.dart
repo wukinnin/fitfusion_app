@@ -56,17 +56,12 @@ class _ResultsScreenState extends State<ResultsScreen>
   }
 
   void _playResultAudio() {
-    if (_audioPlayed || _session == null) return;
+    final session = _session;
+    if (_audioPlayed || session == null) return;
     _audioPlayed = true;
-    try {
-      if (_session!.won) {
-        AppBgmService.instance.playSfx('sfx/victory_orchestra.mp3');
-      } else {
-        AppBgmService.instance.playSfx('sfx/lose_violin.mp3');
-      }
-    } catch (e) {
-      debugPrint('[ResultsScreen] Audio error: $e');
-    }
+    AppBgmService.instance.playSfx(
+      session.won ? 'sfx/victory_orchestra.mp3' : 'sfx/lose_violin.mp3',
+    );
   }
 
   @override
@@ -109,7 +104,7 @@ class _ResultsScreenState extends State<ResultsScreen>
                 context,
                 '/game',
                 (route) => route.isFirst,
-                arguments: _session!.workoutType,
+                arguments: _session!.launchArgs,
               );
             },
             child: const Text('Retry', style: TextStyle(color: AppTheme.gold)),

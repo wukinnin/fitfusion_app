@@ -20,6 +20,7 @@ import 'components/player_lives_display.dart';
 import 'components/rep_progress_bar.dart';
 import 'components/round_banner.dart';
 import 'components/sword_slash_component.dart';
+import 'game_launch_args.dart';
 import 'game_session.dart';
 
 /// The core Flame game engine for FitFusion.
@@ -42,6 +43,14 @@ class FitFusionGame extends FlameGame {
   // Session Config
   WorkoutType _workoutType = WorkoutType.squats;
   WorkoutType get workoutType => _workoutType;
+  int _cooldownSeconds = kCooldownSeconds;
+  int get cooldownSeconds => _cooldownSeconds;
+  double _paceIntervalSeconds = kPaceThresholdSeconds;
+  double get paceIntervalSeconds => _paceIntervalSeconds;
+  GameLaunchArgs _launchArgs = const GameLaunchArgs(
+    workoutType: WorkoutType.squats,
+    cooldownSeconds: kCooldownSeconds,
+  );
 
   // Game Progress
   int _currentRound = 1;
@@ -49,6 +58,7 @@ class FitFusionGame extends FlameGame {
   int _monsterHP = 0;
   int _monsterMaxHP = 0;
   int _playerLives = kStartingLives;
+  int _dragonLifeSteals = 0;
 
   // Session Stats
   int _totalReps = 0;
@@ -114,11 +124,11 @@ class FitFusionGame extends FlameGame {
     // Row 2: Monster (left) | Rep counter (center) | Pace timer (right)
     const row2Y = topY + MonsterHealthBar.barHeight + 8;
 
-    _monster = MonsterComponent()..position = Vector2(8, row2Y);
+    _monster = MonsterComponent()..position = Vector2(24, row2Y + 22);
     add(_monster);
 
     _repProgress = RepProgressBar()
-      ..position = Vector2(MonsterComponent.displayWidth + 16, row2Y + 4);
+      ..position = Vector2(MonsterComponent.layoutWidth + 16, row2Y + 4);
     add(_repProgress);
 
     _paceIndicator = PaceTimerIndicator()
@@ -174,8 +184,18 @@ class FitFusionGame extends FlameGame {
 
   /// Called by GameScreen/GameController before the game session starts.
   /// Must be called BEFORE the game is attached to a GameWidget.
-  void configure({required WorkoutType workoutType}) {
+  void configure({
+    required WorkoutType workoutType,
+    required int cooldownSeconds,
+    required double paceIntervalSeconds,
+    required GameLaunchArgs launchArgs,
+  }) {
     _workoutType = workoutType;
+    _cooldownSeconds = cooldownSeconds.clamp(2, 30).toInt();
+    _paceIntervalSeconds = paceIntervalSeconds > 0
+        ? paceIntervalSeconds
+        : kPaceThresholdSeconds;
+    _launchArgs = launchArgs;
   }
 
   void _resetGame() {
@@ -184,6 +204,8 @@ class FitFusionGame extends FlameGame {
     _monsterMaxHP = repsRequiredForRound(1);
     _monsterHP = _monsterMaxHP;
     _playerLives = kStartingLives;
+    _dragonLifeSteals = 0;
+    _monster.setLifeStealScale(1.0);
 
     _totalReps = 0;
     _livesLost = 0;
@@ -193,7 +215,7 @@ class FitFusionGame extends FlameGame {
     _lastRepTime = null;
     _lastRepRound = 0;
 
-    _paceTimeRemaining = kPaceThresholdSeconds;
+    _paceTimeRemaining = _paceIntervalSeconds;
     _paceTimerActive = false;
 
     // Update all components
@@ -205,10 +227,14 @@ class FitFusionGame extends FlameGame {
 
   void _updateHUD() {
     _healthBar.setHP(_monsterHP, _monsterMaxHP);
-    _repProgress.setProgress(_monsterMaxHP - _monsterHP, _monsterMaxHP);
+    _repProgress.setProgress(
+      (_monsterMaxHP - _monsterHP).clamp(0, _monsterMaxHP).toInt(),
+      _monsterMaxHP,
+    );
     _livesDisplay.setLives(_playerLives);
     _roundBanner.setRound(_currentRound);
     _roundBanner.setWorkoutLabel(_workoutType.displayName.toUpperCase());
+    _paceIndicator.configure(maxSeconds: _paceIntervalSeconds);
     _paceIndicator.setRemaining(_paceTimeRemaining);
   }
 
@@ -327,7 +353,7 @@ class FitFusionGame extends FlameGame {
     _phaseController.add(_phase);
 
     // Pace timer starts immediately after cooldown.
-    _paceTimeRemaining = kPaceThresholdSeconds;
+    _paceTimeRemaining = _paceIntervalSeconds;
     _paceTimerActive = true;
     _paceIndicator.setActive(true);
   }
@@ -348,7 +374,7 @@ class FitFusionGame extends FlameGame {
     _lastRepRound = _currentRound;
 
     // Reset pace timer.
-    _paceTimeRemaining = kPaceThresholdSeconds;
+    _paceTimeRemaining = _paceIntervalSeconds;
     _paceIndicator.setRemaining(_paceTimeRemaining);
 
     // Update visuals
@@ -362,7 +388,7 @@ class FitFusionGame extends FlameGame {
     _spawnHitEffects();
 
     // Audio
-    _playAudioSafe('sfx/thud.mp3');
+    _playAudioSafe(_monsterHP <= 0 ? 'sfx/damage.mp3' : 'sfx/slash.mp3');
 
     if (_monsterHP <= 0) {
       _handleRoundWon();
@@ -376,10 +402,10 @@ class FitFusionGame extends FlameGame {
     );
     slash.activateAt(
       _monster.position.x +
-          MonsterComponent.displayWidth / 2 -
+          _monster.visualWidth / 2 -
           SwordSlashComponent.slashWidth / 2,
       _monster.position.y +
-          MonsterComponent.displayHeight / 2 -
+          _monster.visualHeight / 2 -
           SwordSlashComponent.slashHeight / 2,
     );
 
@@ -388,7 +414,7 @@ class FitFusionGame extends FlameGame {
       orElse: () => _damageNumberPool.first,
     );
     damageNumber.activateAt(
-      _monster.position.x + MonsterComponent.displayWidth / 2,
+      _monster.position.x + _monster.visualWidth / 2,
       _monster.position.y + 10,
     );
   }
@@ -399,11 +425,24 @@ class FitFusionGame extends FlameGame {
 
     _livesDisplay.setLives(_playerLives);
     _damageFlash.trigger();
-    _playAudioSafe('sfx/damage.mp3');
+    _playAudioSafe('sfx/thud.mp3');
+
+    if (_playerLives > 0) {
+      _monsterHP++;
+      _dragonLifeSteals++;
+      _monster.setLifeStealScale(
+        1.0 + (_dragonLifeSteals * kDragonLifeStealScaleBonus),
+      );
+    }
 
     // Reset pace timer after failure
-    _paceTimeRemaining = kPaceThresholdSeconds;
+    _paceTimeRemaining = _paceIntervalSeconds;
     _paceIndicator.setRemaining(_paceTimeRemaining);
+    _healthBar.setHP(_monsterHP, _monsterMaxHP);
+    _repProgress.setProgress(
+      (_monsterMaxHP - _monsterHP).clamp(0, _monsterMaxHP).toInt(),
+      _monsterMaxHP,
+    );
 
     if (_playerLives <= 0) {
       _handleDefeat();
@@ -415,8 +454,8 @@ class FitFusionGame extends FlameGame {
     _paceTimerActive = false;
     _paceIndicator.setActive(false);
 
-    // Freeze pace timer display at 5
-    _paceTimeRemaining = kPaceThresholdSeconds;
+    // Freeze pace timer display at the full workout-specific interval.
+    _paceTimeRemaining = _paceIntervalSeconds;
     _paceIndicator.setRemaining(_paceTimeRemaining);
 
     // Start delay so player sees hit effects, health bar at 0, etc.
@@ -475,23 +514,18 @@ class FitFusionGame extends FlameGame {
           _repIntervals.reduce((a, b) => a + b) / _repIntervals.length;
     }
 
-    // Total reps required across all rounds: sum of (round + 1) for rounds 1..10 = 65
-    int totalRequired = 0;
-    for (int r = 1; r <= kTotalRounds; r++) {
-      totalRequired += repsRequiredForRound(r);
-    }
-
     final session = GameSession(
       workoutType: _workoutType,
       won: won,
       totalReps: _totalReps,
-      totalRepsRequired: totalRequired,
+      totalRepsRequired: kTotalSessionReps,
       totalTimeSeconds: durationSeconds,
       roundsCompleted: _roundsCompleted,
       bestRepIntervalSeconds: bestInterval,
       avgRepIntervalSeconds: avgInterval,
       livesLost: _livesLost,
       completedAt: endTime,
+      launchArgs: _launchArgs,
     );
 
     onSessionComplete(session);

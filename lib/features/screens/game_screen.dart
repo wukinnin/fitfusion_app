@@ -7,6 +7,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/constants.dart';
 import '../../core/enums.dart';
 import '../../core/theme.dart';
 import '../../services/notification_service.dart';
@@ -17,6 +18,7 @@ import '../../widgets/pose_overlay_painter.dart';
 import '../achievements/achievement_service.dart';
 import '../game/fitfusion_game.dart';
 import '../game/game_controller.dart';
+import '../game/game_launch_args.dart';
 import '../game/game_session.dart';
 import '../motion/camera_service.dart';
 import '../motion/pace_monitor.dart';
@@ -52,6 +54,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Future<void>? _shutdownRealtimePipelineFuture;
 
   WorkoutType _workoutType = WorkoutType.squats;
+  int _cooldownSeconds = kCooldownSeconds;
+  double _paceIntervalSeconds = 4.0;
+  GameLaunchArgs? _launchArgs;
 
   @override
   void initState() {
@@ -64,11 +69,42 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     super.didChangeDependencies();
     if (!_isInit) {
       final args = ModalRoute.of(context)?.settings.arguments;
-      if (args is WorkoutType) {
-        _workoutType = args;
-      }
+      _parseLaunchArgs(args);
       _initAll();
       _isInit = true;
+    }
+  }
+
+  void _parseLaunchArgs(Object? args) {
+    if (args is GameLaunchArgs) {
+      _launchArgs = args;
+      _workoutType = args.workoutType;
+      _cooldownSeconds = args.cooldownSeconds;
+    } else if (args is WorkoutType) {
+      _workoutType = args;
+      _cooldownSeconds = kCooldownSeconds;
+      _launchArgs = GameLaunchArgs(
+        workoutType: _workoutType,
+        cooldownSeconds: _cooldownSeconds,
+      );
+    } else {
+      _launchArgs = GameLaunchArgs(
+        workoutType: _workoutType,
+        cooldownSeconds: _cooldownSeconds,
+      );
+    }
+
+    _paceIntervalSeconds = _paceIntervalForWorkout(_workoutType);
+  }
+
+  double _paceIntervalForWorkout(WorkoutType type) {
+    switch (type) {
+      case WorkoutType.squats:
+        return 4.0;
+      case WorkoutType.jumpingJacks:
+        return 3.0;
+      case WorkoutType.obliqueCrunches:
+        return 2.0;
     }
   }
 
@@ -120,7 +156,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
       // Create Flame game — configure() before attaching to GameWidget
       _game = FitFusionGame(onSessionComplete: _onSessionComplete);
-      _game!.configure(workoutType: _workoutType);
+      _game!.configure(
+        workoutType: _workoutType,
+        cooldownSeconds: _cooldownSeconds,
+        paceIntervalSeconds: _paceIntervalSeconds,
+        launchArgs: _launchArgs!,
+      );
+      _paceMonitor.configure(paceIntervalSeconds: _paceIntervalSeconds);
 
       // Create GameController bridge
       if (_repDetector != null) {

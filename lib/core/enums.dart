@@ -8,7 +8,7 @@ enum WorkoutType { squats, jumpingJacks, obliqueCrunches }
 /// Flow: cooldown → playing → cooldown → ... → victory | defeat
 enum GamePhase {
   /// Between rounds. Rep detection and pace timer are paused.
-  /// Countdown is running. Next round begins after kCooldownSeconds.
+  /// Countdown is running. Next round begins after configured cooldown seconds.
   /// Also the initial phase — Round 1 starts with a cooldown.
   cooldown,
 
@@ -28,7 +28,7 @@ enum PaceEventType {
   /// A rep was detected within the pace threshold window. Timer was reset.
   repOnTime,
 
-  /// No rep was detected within kPaceThresholdSeconds. Player loses a life.
+  /// No rep was detected within the configured pace interval. Player loses a life.
   paceFailed,
 }
 

@@ -67,6 +67,10 @@ class GameController {
           paceMonitor.startMonitoring();
           break;
         case GamePhase.cooldown:
+          poseDetectorService.setEnabled(true);
+          repDetector.setEnabled(false);
+          paceMonitor.stopMonitoring();
+          break;
         case GamePhase.victory:
         case GamePhase.defeat:
           poseDetectorService.setEnabled(false);

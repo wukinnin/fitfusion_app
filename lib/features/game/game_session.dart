@@ -1,4 +1,5 @@
 import '../../core/enums.dart';
+import 'game_launch_args.dart';
 
 /// Immutable data class capturing the complete result of one game session.
 /// Matches the Supabase sessions table in DATABASE.md.
@@ -13,6 +14,7 @@ class GameSession {
   final double avgRepIntervalSeconds;
   final int livesLost;
   final DateTime completedAt;
+  final GameLaunchArgs launchArgs;
 
   const GameSession({
     required this.workoutType,
@@ -25,6 +27,7 @@ class GameSession {
     required this.avgRepIntervalSeconds,
     required this.livesLost,
     required this.completedAt,
+    required this.launchArgs,
   });
 
   @override

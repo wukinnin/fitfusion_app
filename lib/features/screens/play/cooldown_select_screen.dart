@@ -5,14 +5,13 @@ import '../../../core/enums.dart';
 import '../../../core/theme.dart';
 import '../../../widgets/fitfusion_animated_background.dart';
 import '../../../widgets/user_profile_footer.dart';
+import '../../game/game_launch_args.dart';
 import 'tutorial_popup.dart';
 
 /// Final pre-game screen — cooldown duration slider.
 ///
 /// Slider range: 2–30 seconds, default 15. Resets to default on every visit
-/// (no persistence). The BEGIN button is intentionally a no-op for now — the
-/// game-proper launch is blocked until the game session is restored. See the
-/// `// TODO(restore-launch):` marker below.
+/// (no persistence).
 class CooldownSelectScreen extends StatefulWidget {
   const CooldownSelectScreen({super.key});
 
@@ -29,9 +28,6 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
 
   WorkoutType _workoutType = WorkoutType.squats;
   bool _isMultiplayer = false;
-  // Kept on state so the future game-launch wiring can read it. Currently
-  // unused because BEGIN is a no-op — see TODO(restore-launch) below.
-  // ignore: unused_field
   String? _player2UserId;
   String? _player2Email;
   bool _argsParsed = false;
@@ -55,34 +51,20 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
     // Respect the user's "Show Tutorial at Startup" preference right before
     // the session begins. The popup itself reads the pref from Supabase and
     // will no-op (invoking onConfirm directly) if the toggle is off.
-    showWorkoutTutorialIfNeeded(
-      context,
-      onConfirm: _launchGame,
-    );
+    showWorkoutTutorialIfNeeded(context, onConfirm: _launchGame);
   }
 
   void _launchGame() {
     if (!mounted) return;
-    // TODO(restore-launch): replace this no-op with:
-    //   Navigator.pushReplacementNamed(
-    //     context,
-    //     '/game',
-    //     arguments: GameLaunchArgs(
-    //       workoutType: _workoutType,
-    //       cooldownSeconds: _cooldownSeconds,
-    //       isMultiplayer: _isMultiplayer,
-    //       player2UserId: _player2UserId,
-    //       player2Email: _player2Email,
-    //     ),
-    //   );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Game launch is temporarily disabled. Coming soon.',
-          style: TextStyle(color: AppTheme.creamWhite),
-        ),
-        backgroundColor: AppTheme.bloodRed,
-        duration: Duration(seconds: 3),
+    Navigator.pushReplacementNamed(
+      context,
+      '/game',
+      arguments: GameLaunchArgs(
+        workoutType: _workoutType,
+        cooldownSeconds: _cooldownSeconds,
+        isMultiplayer: _isMultiplayer,
+        player2UserId: _player2UserId,
+        player2Email: _player2Email,
       ),
     );
   }
@@ -160,7 +142,9 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
                     SliderTheme(
                       data: SliderTheme.of(context).copyWith(
                         activeTrackColor: AppTheme.gold,
-                        inactiveTrackColor: AppTheme.gold.withValues(alpha: 0.3),
+                        inactiveTrackColor: AppTheme.gold.withValues(
+                          alpha: 0.3,
+                        ),
                         thumbColor: AppTheme.gold,
                         overlayColor: AppTheme.gold.withValues(alpha: 0.18),
                         valueIndicatorColor: AppTheme.gold,
@@ -242,8 +226,9 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
                                 Text(
                                   'Minigames after rounds 5 and 10',
                                   style: GoogleFonts.cinzel(
-                                    color: AppTheme.creamWhite
-                                        .withValues(alpha: 0.7),
+                                    color: AppTheme.creamWhite.withValues(
+                                      alpha: 0.7,
+                                    ),
                                     fontSize: 11,
                                   ),
                                 ),
@@ -257,8 +242,6 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
                     SizedBox(
                       height: 64,
                       child: ElevatedButton(
-                        // TODO(restore-launch): currently a no-op. Restore when
-                        // the game session is re-enabled — see _handleBegin().
                         onPressed: _handleBegin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.gold,
