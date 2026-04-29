@@ -35,6 +35,7 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
   String? _player2UserId;
   String? _player2Email;
   bool _argsParsed = false;
+  bool _bonusRounds = false;
 
   void _parseArgs() {
     if (_argsParsed) return;
@@ -195,6 +196,58 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
                             style: GoogleFonts.cinzel(
                               color: AppTheme.creamWhite.withValues(alpha: 0.6),
                               fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.midnightNavy.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppTheme.gold, width: 1.5),
+                      ),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: _bonusRounds,
+                            onChanged: (v) =>
+                                setState(() => _bonusRounds = v ?? false),
+                            activeColor: AppTheme.gold,
+                            checkColor: AppTheme.bloodRed,
+                            side: const BorderSide(
+                              color: AppTheme.gold,
+                              width: 1.5,
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'BONUS ROUNDS',
+                                  style: GoogleFonts.cinzel(
+                                    color: AppTheme.gold,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Minigames after rounds 5 and 10',
+                                  style: GoogleFonts.cinzel(
+                                    color: AppTheme.creamWhite
+                                        .withValues(alpha: 0.7),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],

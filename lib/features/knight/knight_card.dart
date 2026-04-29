@@ -51,20 +51,30 @@ class _KnightCardState extends State<KnightCard>
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<KnightDisposition>(
-      future: KnightService.evaluate(widget.userId),
-      builder: (context, snapshot) {
-        final disposition = snapshot.data ?? KnightDisposition.praise;
-        final line = KnightService.pickRandomLine(disposition);
-        return FutureBuilder<String?>(
-          future: _fetchUsername(),
-          builder: (context, usernameSnapshot) {
-            return FadeTransition(
-              opacity: _fade,
-              child: SlideTransition(
-                position: _slide,
-                child: _buildCard(disposition, line, usernameSnapshot.data),
-              ),
+    // Listen to KnightService.dispositionRevision so the card re-evaluates
+    // immediately whenever a stamp lands, the test override changes, or the
+    // user's state is cleared — no manual refresh / route bounce needed.
+    return ValueListenableBuilder<int>(
+      valueListenable: KnightService.dispositionRevision,
+      builder: (context, _, _) {
+        return FutureBuilder<KnightDisposition>(
+          // Recreating the future on every revision tick is intentional:
+          // it forces a fresh evaluate() call and a freshly-rolled line.
+          future: KnightService.evaluate(widget.userId),
+          builder: (context, snapshot) {
+            final disposition = snapshot.data ?? KnightDisposition.praise;
+            final line = KnightService.pickRandomLine(disposition);
+            return FutureBuilder<String?>(
+              future: _fetchUsername(),
+              builder: (context, usernameSnapshot) {
+                return FadeTransition(
+                  opacity: _fade,
+                  child: SlideTransition(
+                    position: _slide,
+                    child: _buildCard(disposition, line, usernameSnapshot.data),
+                  ),
+                );
+              },
             );
           },
         );

@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'knight_disposition.dart';
@@ -20,11 +21,21 @@ class KnightService {
   static const int kQualifyingRounds = 3;
 
   // Disposition thresholds (durations measured against `now`).
+  // Two-signal ladder: app-open (primary) + session (Praise + fallback).
   static const Duration kPraiseWindow = Duration(hours: 24);
-  static const Duration kQuestionedAppOpenWindow = Duration(hours: 48);
-  static const Duration kConcernedMin = Duration(hours: 48);
-  static const Duration kConcernedMax = Duration(hours: 72);
+  static const Duration kQuestionedWindow = Duration(hours: 48);
   static const Duration kInactiveThreshold = Duration(days: 7);
+
+  /// Bumps every time something happens that could change a user's
+  /// disposition (stamp written, test override toggled, state cleared).
+  /// Widgets that render disposition-sensitive UI (e.g. the home-screen
+  /// `KnightCard`) listen to this so they re-evaluate immediately without
+  /// waiting for a route change or manual rebuild.
+  static final ValueNotifier<int> dispositionRevision = ValueNotifier<int>(0);
+
+  static void _bump() {
+    dispositionRevision.value = dispositionRevision.value + 1;
+  }
 
   static String _key(String userId, String suffix) =>
       '$_prefix.$userId.$suffix';
@@ -34,11 +45,17 @@ class KnightService {
   // ---------------------------------------------------------------------------
 
   /// Stamps both `last_login` and `last_app_open` to now.
+  ///
+  /// `last_login` is no longer read by the disposition evaluator (the
+  /// 2-signal ladder uses only app-open + session), but the stamp is kept
+  /// for any future feature that wants to know when a user last
+  /// authenticated.
   static Future<void> markLogin(String userId) async {
     final prefs = await SharedPreferences.getInstance();
     final nowIso = DateTime.now().toUtc().toIso8601String();
     await prefs.setString(_key(userId, 'last_login'), nowIso);
     await prefs.setString(_key(userId, 'last_app_open'), nowIso);
+    _bump();
   }
 
   /// Stamps `last_app_open` to now.
@@ -48,6 +65,7 @@ class KnightService {
       _key(userId, 'last_app_open'),
       DateTime.now().toUtc().toIso8601String(),
     );
+    _bump();
   }
 
   /// Stamps `last_session` to now, but only if [roundsCompleted] meets the
@@ -63,6 +81,7 @@ class KnightService {
       _key(userId, 'last_session'),
       DateTime.now().toUtc().toIso8601String(),
     );
+    _bump();
   }
 
   // ---------------------------------------------------------------------------
@@ -89,6 +108,7 @@ class KnightService {
     await prefs.remove(_key(userId, 'last_login'));
     await prefs.remove(_key(userId, 'last_app_open'));
     await prefs.remove(_key(userId, 'last_session'));
+    _bump();
   }
 
   // ---------------------------------------------------------------------------
@@ -97,8 +117,16 @@ class KnightService {
 
   static KnightDisposition? _testOverride;
 
-  static void setTestOverride(KnightDisposition d) => _testOverride = d;
-  static void clearTestOverride() => _testOverride = null;
+  static void setTestOverride(KnightDisposition d) {
+    _testOverride = d;
+    _bump();
+  }
+
+  static void clearTestOverride() {
+    _testOverride = null;
+    _bump();
+  }
+
   static KnightDisposition? getTestOverride() => _testOverride;
 
   // ---------------------------------------------------------------------------
@@ -121,44 +149,48 @@ class KnightService {
   /// Pure helper: derives the disposition for a hypothetical [now] given the
   /// most recent activity timestamps. Exposed so the notification scheduler
   /// can project disposition for future days when pre-scheduling.
+  ///
+  /// Two-signal ladder, in weight order:
+  ///   1. First-run welcome → Praise when both timestamps are null.
+  ///   2. Praise override — a qualifying session within [kPraiseWindow]
+  ///      always wins, regardless of how recent app-open is.
+  ///   3. Walk the ladder: prefer `lastAppOpen`, fall back to `lastSession`
+  ///      when app-open is missing. Apply the standard age windows:
+  ///        ≤ 48h          → Questioned
+  ///        48h – 7d       → Concerned
+  ///        ≥ 7d           → Inactive
+  ///   4. Defensive fall-through (both null after step 1) → Inactive.
   static KnightDisposition projectDisposition({
     required DateTime now,
     required DateTime? lastSession,
     required DateTime? lastAppOpen,
   }) {
-    // First-run welcome.
+    // 1. First-run welcome.
     if (lastSession == null && lastAppOpen == null) {
       return KnightDisposition.praise;
     }
 
-    // Praise: qualifying session within last 24h.
+    // 2. Praise: qualifying session within the praise window.
     if (lastSession != null && now.difference(lastSession) <= kPraiseWindow) {
       return KnightDisposition.praise;
     }
 
-    // App-open metric drives the rest.
-    if (lastAppOpen == null) {
+    // 3. Pick the highest-weight available timestamp.
+    final reference = lastAppOpen ?? lastSession;
+    if (reference == null) {
+      // 4. Defensive: should be unreachable given step 1.
       return KnightDisposition.inactive;
     }
 
-    final sinceOpen = now.difference(lastAppOpen);
+    final age = now.difference(reference);
 
-    // Inactive: 7+ days with no app open.
-    if (sinceOpen >= kInactiveThreshold) {
+    if (age >= kInactiveThreshold) {
       return KnightDisposition.inactive;
     }
-
-    // Concerned: 48–72h without an app open.
-    if (sinceOpen >= kConcernedMin) {
-      return KnightDisposition.concerned;
-    }
-
-    // Questioned: app opened within last 48h, but no qualifying session.
-    if (sinceOpen <= kQuestionedAppOpenWindow) {
+    if (age <= kQuestionedWindow) {
       return KnightDisposition.questioned;
     }
-
-    // Fallthrough — should be unreachable, but default to concerned.
+    // Anything between Questioned and Inactive is Concerned.
     return KnightDisposition.concerned;
   }
 
