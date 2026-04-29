@@ -9,11 +9,31 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../core/constants.dart';
 import 'motion_state.dart';
 
+class MultiplayerPoses {
+  final Pose? player1;
+  final Pose? player2;
+
+  const MultiplayerPoses({required this.player1, required this.player2});
+}
+
+class _LanePoseCandidate {
+  final Pose pose;
+  final double centerX;
+
+  const _LanePoseCandidate({required this.pose, required this.centerX});
+}
+
 class PoseDetectorService {
   late final PoseDetector _detector;
   StreamSubscription? _subscription;
   final StreamController<Pose?> _poseController =
       StreamController<Pose?>.broadcast();
+  final StreamController<Pose?> _player1PoseController =
+      StreamController<Pose?>.broadcast();
+  final StreamController<Pose?> _player2PoseController =
+      StreamController<Pose?>.broadcast();
+  final StreamController<MultiplayerPoses> _multiplayerPoseController =
+      StreamController<MultiplayerPoses>.broadcast();
   final StreamController<MotionState> _motionStateController =
       StreamController<MotionState>.broadcast();
   final Duration _minProcessInterval = const Duration(
@@ -38,6 +58,10 @@ class PoseDetectorService {
   }
 
   Stream<Pose?> get poseStream => _poseController.stream;
+  Stream<Pose?> get player1PoseStream => _player1PoseController.stream;
+  Stream<Pose?> get player2PoseStream => _player2PoseController.stream;
+  Stream<MultiplayerPoses> get multiplayerPoseStream =>
+      _multiplayerPoseController.stream;
   Stream<MotionState> get motionStateStream => _motionStateController.stream;
 
   void setEnabled(bool enabled) {
@@ -47,6 +71,7 @@ class PoseDetectorService {
 
     if (!enabled) {
       _poseController.add(null);
+      _publishMultiplayerPoses(null, null);
       _motionStateController.add(_lastMotionState.asStale(DateTime.now()));
     }
   }
@@ -91,20 +116,33 @@ class PoseDetectorService {
         return;
       }
 
-      final pose = poses.first;
-      if (_isDisposed) return;
+      final imageSize = Size(image.width.toDouble(), image.height.toDouble());
+      final validPoses = poses
+          .where(_areCriticalLandmarksReliable)
+          .toList(growable: false);
 
-      // Filter: check that critical landmarks are reliable
-      if (!_areCriticalLandmarksReliable(pose)) {
+      if (validPoses.isEmpty) {
         _publishNoPose();
         return;
       }
 
+      final pose = validPoses.first;
+      final laneCandidates =
+          validPoses
+              .map(
+                (pose) => _LanePoseCandidate(
+                  pose: pose,
+                  centerX: _bodyCenterXOnPreview(pose, imageSize, camera),
+                ),
+              )
+              .toList()
+            ..sort((a, b) => a.centerX.compareTo(b.centerX));
+
+      if (_isDisposed) return;
+
       _poseController.add(pose);
-      _lastMotionState = _buildMotionState(
-        pose,
-        Size(image.width.toDouble(), image.height.toDouble()),
-      );
+      _publishMultiplayerLanePoses(laneCandidates);
+      _lastMotionState = _buildMotionState(pose, imageSize);
       _motionStateController.add(_lastMotionState);
     } catch (e) {
       assert(() {
@@ -120,7 +158,36 @@ class PoseDetectorService {
   void _publishNoPose() {
     if (_isDisposed) return;
     _poseController.add(null);
+    _publishMultiplayerPoses(null, null);
     _motionStateController.add(_lastMotionState.asStale(DateTime.now()));
+  }
+
+  void _publishMultiplayerPoses(Pose? player1, Pose? player2) {
+    if (_isDisposed) return;
+    _player1PoseController.add(player1);
+    _player2PoseController.add(player2);
+    _multiplayerPoseController.add(
+      MultiplayerPoses(player1: player1, player2: player2),
+    );
+  }
+
+  void _publishMultiplayerLanePoses(List<_LanePoseCandidate> candidates) {
+    _LanePoseCandidate? leftLane;
+    _LanePoseCandidate? rightLane;
+
+    for (final candidate in candidates) {
+      if (candidate.centerX < 0.5) {
+        if (leftLane == null || candidate.centerX > leftLane.centerX) {
+          leftLane = candidate;
+        }
+      } else {
+        if (rightLane == null || candidate.centerX < rightLane.centerX) {
+          rightLane = candidate;
+        }
+      }
+    }
+
+    _publishMultiplayerPoses(leftLane?.pose, rightLane?.pose);
   }
 
   InputImage? _buildInputImage(CameraImage image, CameraDescription camera) {
@@ -216,6 +283,29 @@ class PoseDetectorService {
       if (landmark.likelihood < kLandmarkLikelihoodThreshold) return false;
     }
     return true;
+  }
+
+  double _bodyCenterXOnPreview(
+    Pose pose,
+    Size imageSize,
+    CameraDescription camera,
+  ) {
+    final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder]!;
+    final rightShoulder = pose.landmarks[PoseLandmarkType.rightShoulder]!;
+    final leftHip = pose.landmarks[PoseLandmarkType.leftHip]!;
+    final rightHip = pose.landmarks[PoseLandmarkType.rightHip]!;
+    final centerX =
+        (leftShoulder.x + rightShoulder.x + leftHip.x + rightHip.x) / 4;
+
+    final isRotated =
+        camera.sensorOrientation == 90 || camera.sensorOrientation == 270;
+    final imageLogicalWidth = isRotated ? imageSize.height : imageSize.width;
+    var normalizedX = (centerX / imageLogicalWidth).clamp(0.0, 1.0).toDouble();
+
+    if (camera.lensDirection == CameraLensDirection.front) {
+      normalizedX = 1.0 - normalizedX;
+    }
+    return normalizedX;
   }
 
   MotionState _buildMotionState(Pose pose, Size imageSize) {
@@ -362,6 +452,15 @@ class PoseDetectorService {
     await _detector.close();
     if (!_poseController.isClosed) {
       await _poseController.close();
+    }
+    if (!_player1PoseController.isClosed) {
+      await _player1PoseController.close();
+    }
+    if (!_player2PoseController.isClosed) {
+      await _player2PoseController.close();
+    }
+    if (!_multiplayerPoseController.isClosed) {
+      await _multiplayerPoseController.close();
     }
     if (!_motionStateController.isClosed) {
       await _motionStateController.close();

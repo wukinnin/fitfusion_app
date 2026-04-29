@@ -21,6 +21,7 @@ import '../game/game_controller.dart';
 import '../game/game_launch_args.dart';
 import '../game/game_session.dart';
 import '../motion/camera_service.dart';
+import '../motion/mediapipe_multiplayer_pose_service.dart';
 import '../motion/pace_monitor.dart';
 import '../motion/pose_detector_service.dart';
 import '../motion/rep_detector.dart';
@@ -36,8 +37,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   // Motion pipeline
   final CameraService _cameraService = CameraService();
   final PoseDetectorService _poseDetectorService = PoseDetectorService();
+  final MediaPipeMultiplayerPoseService _multiplayerPoseDetectorService =
+      MediaPipeMultiplayerPoseService();
   final PaceMonitor _paceMonitor = PaceMonitor();
   RepDetector? _repDetector;
+  RepDetector? _player1RepDetector;
+  RepDetector? _player2RepDetector;
 
   // Game layer
   FitFusionGame? _game;
@@ -57,6 +62,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   int _cooldownSeconds = kCooldownSeconds;
   double _paceIntervalSeconds = 4.0;
   GameLaunchArgs? _launchArgs;
+
+  bool get _isMultiplayer => _launchArgs?.isMultiplayer == true;
 
   @override
   void initState() {
@@ -91,6 +98,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _launchArgs = GameLaunchArgs(
         workoutType: _workoutType,
         cooldownSeconds: _cooldownSeconds,
+      );
+    }
+
+    if (_launchArgs?.isMultiplayer == true &&
+        _workoutType != WorkoutType.jumpingJacks) {
+      _workoutType = WorkoutType.jumpingJacks;
+      _launchArgs = GameLaunchArgs(
+        workoutType: _workoutType,
+        cooldownSeconds: _cooldownSeconds,
+        isMultiplayer: true,
+        player2UserId: _launchArgs?.player2UserId,
+        player2Email: _launchArgs?.player2Email,
       );
     }
 
@@ -143,15 +162,29 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (_isDisposed || !mounted) return;
 
       if (_cameraService.cameraDescription != null) {
-        _poseDetectorService.startProcessing(
-          _cameraService.frameStream,
-          _cameraService.cameraDescription!,
-        );
-
-        _repDetector = RepDetector(
-          workoutType: _workoutType,
-          poseStream: _poseDetectorService.poseStream,
-        );
+        if (_isMultiplayer) {
+          _multiplayerPoseDetectorService.startProcessing(
+            _cameraService.frameStream,
+            _cameraService.cameraDescription!,
+          );
+          _player1RepDetector = RepDetector(
+            workoutType: WorkoutType.jumpingJacks,
+            poseStream: _multiplayerPoseDetectorService.player1PoseStream,
+          );
+          _player2RepDetector = RepDetector(
+            workoutType: WorkoutType.jumpingJacks,
+            poseStream: _multiplayerPoseDetectorService.player2PoseStream,
+          );
+        } else {
+          _poseDetectorService.startProcessing(
+            _cameraService.frameStream,
+            _cameraService.cameraDescription!,
+          );
+          _repDetector = RepDetector(
+            workoutType: _workoutType,
+            poseStream: _poseDetectorService.poseStream,
+          );
+        }
       }
 
       // Create Flame game — configure() before attaching to GameWidget
@@ -165,13 +198,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _paceMonitor.configure(paceIntervalSeconds: _paceIntervalSeconds);
 
       // Create GameController bridge
-      if (_repDetector != null) {
+      if (_repDetector != null ||
+          (_player1RepDetector != null && _player2RepDetector != null)) {
         _gameController = GameController(
           game: _game!,
-          repDetector: _repDetector!,
-          poseDetectorService: _poseDetectorService,
+          setPoseDetectionEnabled: _setPoseDetectionEnabled,
           paceMonitor: _paceMonitor,
           achievementService: _achievementService,
+          repDetector: _repDetector,
+          player1RepDetector: _player1RepDetector,
+          player2RepDetector: _player2RepDetector,
+          isMultiplayer: _isMultiplayer,
         );
       }
 
@@ -215,6 +252,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         }
       }
     }
+
+    unawaited(SessionService.trySaveMultiplayerPlayer2Session(session));
 
     if (mounted) setState(() => _isSaving = false);
 
@@ -295,11 +334,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Future<void> _shutdownRealtimePipelineInternal() async {
     final gameController = _gameController;
     final repDetector = _repDetector;
+    final player1RepDetector = _player1RepDetector;
+    final player2RepDetector = _player2RepDetector;
     _gameController = null;
     _repDetector = null;
+    _player1RepDetector = null;
+    _player2RepDetector = null;
 
     _poseDetectorService.setEnabled(false);
+    _multiplayerPoseDetectorService.setEnabled(false);
     repDetector?.setEnabled(false);
+    player1RepDetector?.setEnabled(false);
+    player2RepDetector?.setEnabled(false);
     _paceMonitor.stopMonitoring();
 
     await _shutdownStep('game controller', () async {
@@ -309,8 +355,26 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     await _shutdownStep('rep detector', () async {
       await repDetector?.dispose();
     });
+    await _shutdownStep('player 1 rep detector', () async {
+      await player1RepDetector?.dispose();
+    });
+    await _shutdownStep('player 2 rep detector', () async {
+      await player2RepDetector?.dispose();
+    });
     await _shutdownStep('pose detector', _poseDetectorService.dispose);
+    await _shutdownStep(
+      'multiplayer pose detector',
+      _multiplayerPoseDetectorService.dispose,
+    );
     await _shutdownStep('camera', _cameraService.dispose);
+  }
+
+  void _setPoseDetectionEnabled(bool enabled) {
+    if (_isMultiplayer) {
+      _multiplayerPoseDetectorService.setEnabled(enabled);
+    } else {
+      _poseDetectorService.setEnabled(enabled);
+    }
   }
 
   Future<void> _shutdownStep(
@@ -413,24 +477,48 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             // Layer 1: Camera feed
             CameraPreviewWidget(controller: _cameraService.controller),
 
+            if (_isMultiplayer) const _MultiplayerLaneOverlay(),
+
             // Layer 2: Pose skeleton overlay (debug only)
             if (kDebugMode)
-              StreamBuilder<Pose?>(
-                stream: _poseDetectorService.poseStream,
-                builder: (context, snapshot) {
-                  final pose = snapshot.data;
-                  if (_cameraService.controller?.value.previewSize == null) {
-                    return const SizedBox.shrink();
-                  }
-                  return PoseOverlayWidget(
-                    pose: pose,
-                    inputImageSize:
-                        _cameraService.controller!.value.previewSize!,
-                    lensDirection: _cameraService.lensDirection,
-                    sensorOrientation: _cameraService.sensorOrientation,
-                  );
-                },
-              ),
+              _isMultiplayer
+                  ? StreamBuilder<MultiplayerPoses>(
+                      stream:
+                          _multiplayerPoseDetectorService.multiplayerPoseStream,
+                      builder: (context, snapshot) {
+                        final poses = snapshot.data;
+                        if (_cameraService.controller?.value.previewSize ==
+                                null ||
+                            poses == null) {
+                          return const SizedBox.shrink();
+                        }
+                        return MultiplayerPoseOverlayWidget(
+                          player1Pose: poses.player1,
+                          player2Pose: poses.player2,
+                          inputImageSize:
+                              _cameraService.controller!.value.previewSize!,
+                          lensDirection: _cameraService.lensDirection,
+                          sensorOrientation: _cameraService.sensorOrientation,
+                        );
+                      },
+                    )
+                  : StreamBuilder<Pose?>(
+                      stream: _poseDetectorService.poseStream,
+                      builder: (context, snapshot) {
+                        final pose = snapshot.data;
+                        if (_cameraService.controller?.value.previewSize ==
+                            null) {
+                          return const SizedBox.shrink();
+                        }
+                        return PoseOverlayWidget(
+                          pose: pose,
+                          inputImageSize:
+                              _cameraService.controller!.value.previewSize!,
+                          lensDirection: _cameraService.lensDirection,
+                          sensorOrientation: _cameraService.sensorOrientation,
+                        );
+                      },
+                    ),
 
             // Layer 3: Flame game with transparent background
             GameWidget(game: _game!),
@@ -459,6 +547,79 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MultiplayerLaneOverlay extends StatelessWidget {
+  const _MultiplayerLaneOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.gold.withValues(alpha: 0.08),
+                    border: Border(
+                      right: BorderSide(
+                        color: AppTheme.gold.withValues(alpha: 0.75),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  color: AppTheme.crimson.withValues(alpha: 0.08),
+                ),
+              ),
+            ],
+          ),
+          Align(
+            alignment: const Alignment(-0.82, -0.12),
+            child: _LaneLabel(text: 'P1'),
+          ),
+          Align(
+            alignment: const Alignment(0.82, -0.12),
+            child: _LaneLabel(text: 'P2'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LaneLabel extends StatelessWidget {
+  final String text;
+
+  const _LaneLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        border: Border.all(color: AppTheme.gold, width: 2),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: AppTheme.gold,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            shadows: [Shadow(blurRadius: 4, color: Colors.black)],
+          ),
         ),
       ),
     );

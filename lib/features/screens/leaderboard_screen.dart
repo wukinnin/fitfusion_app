@@ -6,6 +6,16 @@ import '../../core/theme.dart';
 import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
 
+class _GroupedWorkoutRows {
+  final List<Map<String, dynamic>> singleplayer;
+  final List<Map<String, dynamic>> multiplayer;
+
+  const _GroupedWorkoutRows({
+    required this.singleplayer,
+    required this.multiplayer,
+  });
+}
+
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
 
@@ -59,42 +69,50 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     super.dispose();
   }
 
-  String _cacheKey(int tab, int metric, [int mode = 0]) =>
-      '$tab:$metric:$mode';
+  String _cacheKey(int tab, int metric, [int mode = 0]) => '$tab:$metric:$mode';
 
   Future<void> _fetchAll() async {
     try {
-      // Fetch workout leaderboards (clear time + best rep interval per workout type)
-      final clearTimeRows = await _client.from('v_top10_clear_time').select();
-      final repIntervalRows = await _client
-          .from('v_top10_best_rep_interval')
-          .select();
+      final sessionRows = await _client
+          .from('sessions')
+          .select(
+            'id, user_id, workout_type, won, rounds_completed, total_reps, '
+            'lives_lost, total_time_seconds, best_rep_interval_seconds, '
+            'avg_rep_interval_seconds, completed_at, users(username)',
+          )
+          .eq('won', true)
+          .not('total_time_seconds', 'is', null)
+          .order('completed_at', ascending: false)
+          .limit(500);
+
+      final workoutRows = (sessionRows as List)
+          .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
+          .toList();
+      final grouped = _groupWorkoutSessions(workoutRows);
 
       for (int tab = 0; tab < 3; tab++) {
         final dbKey = _workoutDbKeys[tab];
 
-        // Clear time (metric 0) — singleplayer
-        final ctEntries =
-            (clearTimeRows as List)
-                .where((r) => r['workout_type'] == dbKey)
-                .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
-                .toList()
-              ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
-        _cache[_cacheKey(tab, 0, 0)] = ctEntries;
-
-        // Best rep interval (metric 1) — singleplayer
-        final riEntries =
-            (repIntervalRows as List)
-                .where((r) => r['workout_type'] == dbKey)
-                .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
-                .toList()
-              ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
-        _cache[_cacheKey(tab, 1, 0)] = riEntries;
-
-        // Multiplayer caches stay empty until the backend pipeline lands.
-        // Placeholder rows render automatically when these are missing.
-        // TODO(multiplayer-leaderboard): populate _cache[_cacheKey(tab, 0, 1)]
-        // and _cache[_cacheKey(tab, 1, 1)] from the multiplayer-aware view.
+        _cache[_cacheKey(tab, 0, 0)] = _rankRows(
+          grouped.singleplayer
+              .where((r) => r['workout_type'] == dbKey)
+              .toList(),
+          metricKey: 'total_time_seconds',
+        );
+        _cache[_cacheKey(tab, 1, 0)] = _rankRows(
+          grouped.singleplayer
+              .where((r) => r['workout_type'] == dbKey)
+              .toList(),
+          metricKey: 'best_rep_interval_seconds',
+        );
+        _cache[_cacheKey(tab, 0, 1)] = _rankRows(
+          grouped.multiplayer.where((r) => r['workout_type'] == dbKey).toList(),
+          metricKey: 'total_time_seconds',
+        );
+        _cache[_cacheKey(tab, 1, 1)] = _rankRows(
+          grouped.multiplayer.where((r) => r['workout_type'] == dbKey).toList(),
+          metricKey: 'best_rep_interval_seconds',
+        );
       }
 
       // Fetch lifetime leaderboards
@@ -119,6 +137,118 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     }
 
     if (mounted) setState(() => _loading = false);
+  }
+
+  _GroupedWorkoutRows _groupWorkoutSessions(List<Map<String, dynamic>> rows) {
+    final buckets = <String, List<Map<String, dynamic>>>{};
+
+    for (final row in rows) {
+      buckets.putIfAbsent(_multiplayerPairKey(row), () => []).add(row);
+    }
+
+    final pairedIds = <String>{};
+    final multiplayerRows = <Map<String, dynamic>>[];
+
+    for (final bucket in buckets.values) {
+      final byUser = <String, Map<String, dynamic>>{};
+      for (final row in bucket) {
+        final userId = row['user_id']?.toString();
+        if (userId == null || userId.isEmpty) continue;
+        byUser.putIfAbsent(userId, () => row);
+      }
+
+      if (byUser.length < 2) continue;
+
+      final pair = byUser.values.take(2).toList();
+      pairedIds.add(pair[0]['id'].toString());
+      pairedIds.add(pair[1]['id'].toString());
+      multiplayerRows.add(_buildMultiplayerRow(pair[0], pair[1]));
+    }
+
+    final singleplayerRows = rows
+        .where((row) => !pairedIds.contains(row['id']?.toString()))
+        .map(_buildSingleplayerRow)
+        .toList();
+
+    return _GroupedWorkoutRows(
+      singleplayer: singleplayerRows,
+      multiplayer: multiplayerRows,
+    );
+  }
+
+  String _multiplayerPairKey(Map<String, dynamic> row) {
+    return [
+      row['workout_type'],
+      row['won'],
+      row['rounds_completed'],
+      row['total_reps'],
+      row['lives_lost'],
+      _metricKeyValue(row['total_time_seconds']),
+      _metricKeyValue(row['best_rep_interval_seconds']),
+      _metricKeyValue(row['avg_rep_interval_seconds']),
+      row['completed_at'],
+    ].join('|');
+  }
+
+  String _metricKeyValue(dynamic value) {
+    final number = _asDouble(value);
+    if (number == null) return '';
+    return number.toStringAsFixed(6);
+  }
+
+  Map<String, dynamic> _buildSingleplayerRow(Map<String, dynamic> row) {
+    return {
+      'workout_type': row['workout_type'],
+      'username': _usernameForRow(row),
+      'total_time_seconds': row['total_time_seconds'],
+      'best_rep_interval_seconds': row['best_rep_interval_seconds'],
+    };
+  }
+
+  Map<String, dynamic> _buildMultiplayerRow(
+    Map<String, dynamic> first,
+    Map<String, dynamic> second,
+  ) {
+    return {
+      'workout_type': first['workout_type'],
+      'username_a': _usernameForRow(first),
+      'username_b': _usernameForRow(second),
+      'total_time_seconds': first['total_time_seconds'],
+      'best_rep_interval_seconds': first['best_rep_interval_seconds'],
+    };
+  }
+
+  String _usernameForRow(Map<String, dynamic> row) {
+    final user = row['users'];
+    if (user is Map && user['username'] != null) {
+      return user['username'].toString();
+    }
+    return '--';
+  }
+
+  List<Map<String, dynamic>> _rankRows(
+    List<Map<String, dynamic>> rows, {
+    required String metricKey,
+  }) {
+    final ranked =
+        rows.where((row) => _asDouble(row[metricKey]) != null).map((row) {
+          return {...row, 'value': _asDouble(row[metricKey])};
+        }).toList()..sort((a, b) {
+          return (_asDouble(a['value']) ?? double.infinity).compareTo(
+            _asDouble(b['value']) ?? double.infinity,
+          );
+        });
+
+    return List<Map<String, dynamic>>.generate(
+      ranked.length > 10 ? 10 : ranked.length,
+      (index) => {...ranked[index], 'rank': index + 1},
+    );
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
   }
 
   String _formatValue(dynamic value, {required bool isTime}) {
