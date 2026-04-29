@@ -5,25 +5,19 @@ import '../../../core/enums.dart';
 import '../../../core/theme.dart';
 import '../../../widgets/fitfusion_animated_background.dart';
 import '../../../widgets/user_profile_footer.dart';
-import 'tutorial_popup.dart';
 
 /// Multiplayer workout picker. Currently only Jumping Jacks is supported;
 /// the other two are rendered disabled with a small "MULTIPLAYER ONLY: JJ"
-/// affordance.
+/// affordance. The tutorial popup runs later — at the BEGIN step — so the
+/// flow matches singleplayer.
 class WorkoutSelectMultiplayerScreen extends StatelessWidget {
   const WorkoutSelectMultiplayerScreen({super.key});
 
   void _onJumpingJacksSelected(BuildContext context) {
-    showWorkoutTutorialIfNeeded(
+    Navigator.pushNamed(
       context,
-      onConfirm: () {
-        if (!context.mounted) return;
-        Navigator.pushNamed(
-          context,
-          '/multiplayer/p2-email',
-          arguments: {'workoutType': WorkoutType.jumpingJacks},
-        );
-      },
+      '/multiplayer/p2-email',
+      arguments: {'workoutType': WorkoutType.jumpingJacks},
     );
   }
 

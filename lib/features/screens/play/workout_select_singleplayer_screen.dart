@@ -5,27 +5,20 @@ import '../../../core/enums.dart';
 import '../../../core/theme.dart';
 import '../../../widgets/fitfusion_animated_background.dart';
 import '../../../widgets/user_profile_footer.dart';
-import 'tutorial_popup.dart';
 
 /// Singleplayer workout picker — squats / jumping jacks / side crunches.
-/// Shares the "HOW TO PLAY" bottom-sheet with the multiplayer flow via
-/// [showWorkoutTutorialIfNeeded].
+/// The tutorial popup is deferred to the cooldown screen's BEGIN button so
+/// it shows right before the game session starts.
 class WorkoutSelectSingleplayerScreen extends StatelessWidget {
   const WorkoutSelectSingleplayerScreen({super.key});
 
   void _onWorkoutSelected(BuildContext context, WorkoutType type) {
-    showWorkoutTutorialIfNeeded(
+    Navigator.pushNamed(
       context,
-      onConfirm: () {
-        if (!context.mounted) return;
-        Navigator.pushNamed(
-          context,
-          '/select/cooldown',
-          arguments: {
-            'workoutType': type,
-            'isMultiplayer': false,
-          },
-        );
+      '/select/cooldown',
+      arguments: {
+        'workoutType': type,
+        'isMultiplayer': false,
       },
     );
   }

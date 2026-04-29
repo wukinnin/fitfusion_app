@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/enums.dart';
@@ -173,16 +172,13 @@ class _P2EmailScreenState extends State<P2EmailScreen> {
                       enabled: !_isSending,
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
-                      enableSuggestions: false,
-                      textCapitalization: TextCapitalization.none,
-                      inputFormatters: [_LowercaseTextFormatter()],
-                      style: GoogleFonts.cinzel(
+                      style: const TextStyle(
                         color: AppTheme.creamWhite,
-                        fontSize: 15,
-                        letterSpacing: 0.5,
+                        fontFamily: 'Georgia',
+                        fontSize: 16,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'player 2 email',
+                        labelText: 'Player 2 Email',
                         labelStyle: GoogleFonts.cinzel(
                           color: AppTheme.gold,
                         ),
@@ -279,24 +275,6 @@ class _P2EmailScreenState extends State<P2EmailScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Forces all input to lowercase as the user types — emails are case-
-/// insensitive and Supabase stores them lowercased.
-class _LowercaseTextFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final lower = newValue.text.toLowerCase();
-    if (lower == newValue.text) return newValue;
-    return newValue.copyWith(
-      text: lower,
-      selection: newValue.selection,
-      composing: TextRange.empty,
     );
   }
 }

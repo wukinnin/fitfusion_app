@@ -5,6 +5,7 @@ import '../../../core/enums.dart';
 import '../../../core/theme.dart';
 import '../../../widgets/fitfusion_animated_background.dart';
 import '../../../widgets/user_profile_footer.dart';
+import 'tutorial_popup.dart';
 
 /// Final pre-game screen — cooldown duration slider.
 ///
@@ -50,6 +51,17 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
   }
 
   void _handleBegin() {
+    // Respect the user's "Show Tutorial at Startup" preference right before
+    // the session begins. The popup itself reads the pref from Supabase and
+    // will no-op (invoking onConfirm directly) if the toggle is off.
+    showWorkoutTutorialIfNeeded(
+      context,
+      onConfirm: _launchGame,
+    );
+  }
+
+  void _launchGame() {
+    if (!mounted) return;
     // TODO(restore-launch): replace this no-op with:
     //   Navigator.pushReplacementNamed(
     //     context,

@@ -7,22 +7,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 bool shouldPlayMenuForRoute(String? routeName) {
   if (routeName == null) return false;
 
-  const allowedRoutes = <String>{
-    '/home',
-    '/select',
-    '/select/mode',
-    '/select/workout/singleplayer',
-    '/select/workout/multiplayer',
-    '/select/cooldown',
-    '/multiplayer/p2-email',
-    '/leaderboard',
-    '/stats',
-    '/achievements',
-    '/settings',
+  // Menu BGM plays everywhere the player spends time in menus — including
+  // the "deeper" auth screens (verify / forgot / reset password). The only
+  // screens that should stay silent are the cold-start entry points and
+  // the game proper itself.
+  const silentRoutes = <String>{
+    '/', // Splash
+    '/auth', // Welcome / auth landing
+    '/auth/login',
+    '/auth/signup',
+    '/game', // Game proper owns its own soundtrack.
   };
 
-  return allowedRoutes.contains(routeName) ||
-      routeName.startsWith('/settings/');
+  return !silentRoutes.contains(routeName);
 }
 
 class AppBgmRouteObserver extends NavigatorObserver {
