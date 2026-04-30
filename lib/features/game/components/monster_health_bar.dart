@@ -30,6 +30,8 @@ class MonsterHealthBar extends PositionComponent
 
   @override
   void render(Canvas canvas) {
+    if (game.isBonusMode) return;
+
     final barWidth = game.size.x - 24;
     if (_cachedBarWidth != barWidth) {
       _cachedBarWidth = barWidth;

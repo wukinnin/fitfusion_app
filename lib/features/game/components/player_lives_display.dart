@@ -37,6 +37,8 @@ class PlayerLivesDisplay extends PositionComponent
 
   @override
   void render(Canvas canvas) {
+    if (game.isBonusMode) return;
+
     for (int i = 0; i < kStartingLives; i++) {
       final isActive = i < _lives;
       final paint = isActive ? _activePaint : _lostPaint;

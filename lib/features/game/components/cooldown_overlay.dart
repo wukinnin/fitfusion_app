@@ -30,6 +30,10 @@ class CooldownOverlay extends PositionComponent
   final TextPainter _roundPainter = TextPainter(
     textDirection: TextDirection.ltr,
   );
+  final TextPainter _captionPainter = TextPainter(
+    textDirection: TextDirection.ltr,
+    textAlign: TextAlign.center,
+  );
   final TextStyle _roundStyle = GoogleFonts.cinzel(
     color: const Color(0xFFFFFDE7),
     fontSize: 48,
@@ -45,6 +49,15 @@ class CooldownOverlay extends PositionComponent
     fontWeight: FontWeight.bold,
     shadows: const [Shadow(blurRadius: 4, color: Colors.black)],
   );
+  final TextStyle _captionStyle = GoogleFonts.cinzel(
+    color: const Color(0xFFFFD700),
+    fontSize: 20,
+    fontWeight: FontWeight.bold,
+    shadows: const [
+      Shadow(blurRadius: 8, color: Colors.black),
+      Shadow(blurRadius: 4, color: Colors.black),
+    ],
+  );
   List<TextPainter> _countdownPainters = [];
 
   _CooldownPhase _phase = _CooldownPhase.slideIn;
@@ -52,6 +65,10 @@ class CooldownOverlay extends PositionComponent
   int _cooldownSeconds = 15;
   double _countdownRemaining = 15;
   int _nextRound = 1;
+  String? _titleOverride;
+  String? _caption;
+  bool _hideWorkoutImage = false;
+  bool _captionAtBottom = false;
   bool _isActive = false;
   bool _roundTextDirty = true;
   double _cachedScreenW = -1;
@@ -82,8 +99,18 @@ class CooldownOverlay extends PositionComponent
     }
   }
 
-  void startCooldown(int nextRound) {
+  void startCooldown(
+    int nextRound, {
+    String? title,
+    String? caption,
+    bool hideWorkoutImage = false,
+    bool captionAtBottom = false,
+  }) {
     _nextRound = nextRound;
+    _titleOverride = title;
+    _caption = caption;
+    _hideWorkoutImage = hideWorkoutImage;
+    _captionAtBottom = captionAtBottom;
     _roundTextDirty = true;
     _imageLayoutDirty = true;
     _phase = _CooldownPhase.slideIn;
@@ -199,16 +226,43 @@ class CooldownOverlay extends PositionComponent
     // "ROUND X" header — top area
     if (_roundTextDirty) {
       _roundPainter.text = TextSpan(
-        text: 'ROUND $_nextRound',
+        text: _titleOverride ?? 'ROUND $_nextRound',
         style: _roundStyle,
       );
       _roundPainter.layout();
+      if (_caption != null && _caption!.isNotEmpty) {
+        _captionPainter.text = TextSpan(text: _caption, style: _captionStyle);
+        _captionPainter.layout(maxWidth: screenW * 0.82);
+      } else {
+        _captionPainter.text = const TextSpan(text: '');
+        _captionPainter.layout();
+      }
       _roundTextDirty = false;
     }
-    _roundPainter.paint(
-      canvas,
-      Offset((screenW - _roundPainter.width) / 2, screenH * 0.12),
-    );
+    if (_captionAtBottom) {
+      final titleY = screenH * 0.76;
+      if (_caption != null && _caption!.isNotEmpty) {
+        _captionPainter.paint(
+          canvas,
+          Offset((screenW - _captionPainter.width) / 2, titleY - 58),
+        );
+      }
+      _roundPainter.paint(
+        canvas,
+        Offset((screenW - _roundPainter.width) / 2, titleY),
+      );
+    } else {
+      _roundPainter.paint(
+        canvas,
+        Offset((screenW - _roundPainter.width) / 2, screenH * 0.12),
+      );
+      if (_caption != null && _caption!.isNotEmpty) {
+        _captionPainter.paint(
+          canvas,
+          Offset((screenW - _captionPainter.width) / 2, screenH * 0.20),
+        );
+      }
+    }
 
     // Countdown circle — center area
     final centerX = _timerCenter.dx;
@@ -239,7 +293,7 @@ class CooldownOverlay extends PositionComponent
     );
 
     // Exercise illustration — below timer (contain-fit, no stretching)
-    final image = _exerciseImages[game.workoutType];
+    final image = _hideWorkoutImage ? null : _exerciseImages[game.workoutType];
     if (image != null) {
       _updateImageLayout(image, screenW, screenH);
       canvas.drawImageRect(image, _imageSrcRect, _imageDstRect, _imagePaint);
@@ -257,6 +311,7 @@ class CooldownOverlay extends PositionComponent
     _timerCenter = Offset(screenW / 2, screenH * 0.35);
     _arcRect = Rect.fromCircle(center: _timerCenter, radius: _circleRadius);
     _imageLayoutDirty = true;
+    _roundTextDirty = true;
   }
 
   void _updateImageLayout(ui.Image image, double screenW, double screenH) {

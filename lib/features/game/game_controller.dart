@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../core/enums.dart';
 import '../../core/events.dart';
@@ -21,6 +22,8 @@ class GameController {
   final RepDetector? player1RepDetector;
   final RepDetector? player2RepDetector;
   final void Function(bool enabled) setPoseDetectionEnabled;
+  final Stream<Pose?>? bonusPoseStream;
+  final BonusPoseSnapshot? Function(Pose pose)? bonusPoseMapper;
   final PaceMonitor paceMonitor;
   final AchievementService achievementService;
   final bool isMultiplayer;
@@ -28,6 +31,7 @@ class GameController {
   StreamSubscription<RepEvent>? _repSubscription;
   StreamSubscription<RepEvent>? _player1RepSubscription;
   StreamSubscription<RepEvent>? _player2RepSubscription;
+  StreamSubscription<Pose?>? _bonusPoseSubscription;
   StreamSubscription<PaceEvent>? _paceSubscription;
   StreamSubscription<GamePhase>? _phaseSubscription;
   Timer? _pendingRepTimer;
@@ -44,6 +48,8 @@ class GameController {
     this.player1RepDetector,
     this.player2RepDetector,
     this.isMultiplayer = false,
+    this.bonusPoseStream,
+    this.bonusPoseMapper,
   }) {
     _wireStreams();
   }
@@ -65,6 +71,14 @@ class GameController {
       });
     }
 
+    _bonusPoseSubscription = bonusPoseStream?.listen((pose) {
+      if (pose == null || game.phase != GamePhase.bonusPlaying) return;
+      final snapshot = bonusPoseMapper?.call(pose);
+      if (snapshot != null) {
+        game.onBonusPose(snapshot);
+      }
+    });
+
     // Pace events → game
     _paceSubscription = paceMonitor.paceStream.listen((event) {
       if (event.type == PaceEventType.paceFailed &&
@@ -83,6 +97,13 @@ class GameController {
           paceMonitor.startMonitoring();
           break;
         case GamePhase.cooldown:
+        case GamePhase.bonusCooldown:
+          setPoseDetectionEnabled(true);
+          _setRepDetectorsEnabled(false);
+          _clearPendingMultiplayerReps();
+          paceMonitor.stopMonitoring();
+          break;
+        case GamePhase.bonusPlaying:
           setPoseDetectionEnabled(true);
           _setRepDetectorsEnabled(false);
           _clearPendingMultiplayerReps();
@@ -159,11 +180,13 @@ class GameController {
     final repSubscription = _repSubscription;
     final player1RepSubscription = _player1RepSubscription;
     final player2RepSubscription = _player2RepSubscription;
+    final bonusPoseSubscription = _bonusPoseSubscription;
     final paceSubscription = _paceSubscription;
     final phaseSubscription = _phaseSubscription;
     _repSubscription = null;
     _player1RepSubscription = null;
     _player2RepSubscription = null;
+    _bonusPoseSubscription = null;
     _paceSubscription = null;
     _phaseSubscription = null;
     _clearPendingMultiplayerReps();
@@ -171,6 +194,7 @@ class GameController {
     await repSubscription?.cancel();
     await player1RepSubscription?.cancel();
     await player2RepSubscription?.cancel();
+    await bonusPoseSubscription?.cancel();
     await paceSubscription?.cancel();
     await phaseSubscription?.cancel();
     assert(() {

@@ -65,6 +65,7 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
         isMultiplayer: _isMultiplayer,
         player2UserId: _player2UserId,
         player2Email: _player2Email,
+        bonusRoundsEnabled: _bonusRounds && !_isMultiplayer,
       ),
     );
   }
@@ -224,7 +225,7 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Minigames after rounds 5 and 10',
+                                  'Minigames after rounds 4 and 8',
                                   style: GoogleFonts.cinzel(
                                     color: AppTheme.creamWhite.withValues(
                                       alpha: 0.7,

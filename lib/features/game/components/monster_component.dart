@@ -68,6 +68,12 @@ class MonsterComponent extends PositionComponent
   }
 
   @override
+  void renderTree(Canvas canvas) {
+    if (game.isBonusMode) return;
+    super.renderTree(canvas);
+  }
+
+  @override
   void render(Canvas canvas) {
     super.render(canvas);
     // White silhouette flash overlay (Zelda II style)

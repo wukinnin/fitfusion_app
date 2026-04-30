@@ -10,6 +10,7 @@ import '../../core/enums.dart';
 import '../../core/extensions.dart';
 import '../../services/app_bgm_service.dart';
 import 'components/achievement_popup.dart';
+import 'components/bonus_item_component.dart';
 import 'components/cooldown_overlay.dart';
 import 'components/damage_flash_overlay.dart';
 import 'components/damage_number.dart';
@@ -22,6 +23,20 @@ import 'components/round_banner.dart';
 import 'components/sword_slash_component.dart';
 import 'game_launch_args.dart';
 import 'game_session.dart';
+
+enum _CooldownTarget { normalRound, beforeBonus, afterBonus }
+
+class BonusPoseSnapshot {
+  final Offset handPosition;
+  final Offset bodyCenter;
+  final double bodyRadius;
+
+  const BonusPoseSnapshot({
+    required this.handPosition,
+    required this.bodyCenter,
+    required this.bodyRadius,
+  });
+}
 
 /// The core Flame game engine for FitFusion.
 /// Manages game state, rounds, lives, and session data.
@@ -39,6 +54,7 @@ class FitFusionGame extends FlameGame {
 
   GamePhase _phase = GamePhase.cooldown;
   GamePhase get phase => _phase;
+  bool get isBonusMode => _phase == GamePhase.bonusPlaying;
 
   // Session Config
   WorkoutType _workoutType = WorkoutType.squats;
@@ -51,6 +67,7 @@ class FitFusionGame extends FlameGame {
     workoutType: WorkoutType.squats,
     cooldownSeconds: kCooldownSeconds,
   );
+  bool _bonusRoundsEnabled = false;
 
   // Game Progress
   int _currentRound = 1;
@@ -59,6 +76,17 @@ class FitFusionGame extends FlameGame {
   int _monsterMaxHP = 0;
   int _playerLives = kStartingLives;
   int _dragonLifeSteals = 0;
+  int _bonusGemsCollected = 0;
+  int _activeBonusNumber = 0;
+  double _bonusTimeRemaining = 15;
+  double _bonusElapsedTotal = 0;
+  double _bonusTargetMoveTimer = 0;
+  bool _bonusEnding = false;
+  double _bonusEndDelay = 0;
+  Offset? _lastBonusSpawnCenter;
+  Offset? _lastBonusBodyCenter;
+  double _lastBonusBodyRadius = 0;
+  _CooldownTarget _cooldownTarget = _CooldownTarget.normalRound;
 
   // Session Stats
   int _totalReps = 0;
@@ -90,8 +118,10 @@ class FitFusionGame extends FlameGame {
   late final RoundBanner _roundBanner;
   late final CooldownOverlay _cooldownOverlay;
   late final DamageFlashOverlay _damageFlash;
+  final List<BonusItemComponent> _bonusItems = [];
   final List<SwordSlashComponent> _slashPool = [];
   final List<DamageNumber> _damageNumberPool = [];
+  final Random _bonusRandom = Random();
 
   // HUD components — slide in/out with cooldown
   final List<PositionComponent> _hudComponents = [];
@@ -113,6 +143,8 @@ class FitFusionGame extends FlameGame {
       'game/squats.png',
       'game/jumping-jacks.png',
       'game/side-crunches.png',
+      'game/diamond.png',
+      'game/poison.png',
     ]);
 
     // === TOP HUD LAYOUT ===
@@ -153,6 +185,18 @@ class FitFusionGame extends FlameGame {
     _cooldownOverlay = CooldownOverlay()
       ..onCooldownComplete = _onCooldownComplete;
     add(_cooldownOverlay);
+
+    final gemSprite = Sprite(images.fromCache('game/diamond.png'));
+    final poisonSprite = Sprite(images.fromCache('game/poison.png'));
+    final gemItem = BonusItemComponent(kind: BonusItemKind.gem)
+      ..sprite = gemSprite;
+    _bonusItems.add(gemItem);
+    add(gemItem);
+
+    final poisonItem = BonusItemComponent(kind: BonusItemKind.poison)
+      ..sprite = poisonSprite;
+    _bonusItems.add(poisonItem);
+    add(poisonItem);
 
     for (var i = 0; i < 6; i++) {
       final slash = SwordSlashComponent();
@@ -196,6 +240,8 @@ class FitFusionGame extends FlameGame {
         ? paceIntervalSeconds
         : kPaceThresholdSeconds;
     _launchArgs = launchArgs;
+    _bonusRoundsEnabled =
+        launchArgs.bonusRoundsEnabled && !launchArgs.isMultiplayer;
   }
 
   void _resetGame() {
@@ -206,6 +252,17 @@ class FitFusionGame extends FlameGame {
     _playerLives = kStartingLives;
     _dragonLifeSteals = 0;
     _monster.setLifeStealScale(1.0);
+    _bonusGemsCollected = 0;
+    _activeBonusNumber = 0;
+    _bonusTimeRemaining = 15;
+    _bonusElapsedTotal = 0;
+    _bonusTargetMoveTimer = 0;
+    _bonusEnding = false;
+    _bonusEndDelay = 0;
+    _lastBonusSpawnCenter = null;
+    _lastBonusBodyCenter = null;
+    _lastBonusBodyRadius = 0;
+    _deactivateBonusItems();
 
     _totalReps = 0;
     _livesLost = 0;
@@ -274,6 +331,10 @@ class FitFusionGame extends FlameGame {
       _paceIndicator.setRemaining(_paceTimeRemaining);
     }
 
+    if (_phase == GamePhase.bonusPlaying) {
+      _updateBonusRound(dt);
+    }
+
     // Post-round-win delay before cooldown transition
     if (_waitingForRoundWinDelay) {
       _roundWinDelayTimer += dt;
@@ -294,6 +355,7 @@ class FitFusionGame extends FlameGame {
     _popupTimers.clear();
     _slashPool.clear();
     _damageNumberPool.clear();
+    _bonusItems.clear();
     _hudComponents.clear();
     _hudOriginalX.clear();
     _repIntervals.clear();
@@ -321,6 +383,14 @@ class FitFusionGame extends FlameGame {
     _handlePaceFailure();
   }
 
+  void onBonusPose(BonusPoseSnapshot snapshot) {
+    if (_phase != GamePhase.bonusPlaying) return;
+    _lastBonusBodyCenter = snapshot.bodyCenter;
+    _lastBonusBodyRadius = snapshot.bodyRadius;
+    _spawnPendingBonusTargetIfReady();
+    _handleBonusCollision(snapshot.handPosition);
+  }
+
   /// Force an immediate defeat (e.g. back button press, app paused).
   void forceDefeat() {
     if (_sessionEnded) return;
@@ -329,12 +399,14 @@ class FitFusionGame extends FlameGame {
     _playerLives = 0;
     _livesDisplay.setLives(0);
     _cooldownOverlay.stopCooldown();
+    _deactivateBonusItems();
     _handleDefeat();
   }
 
   // --- Phase Management ---
 
   void _enterCooldown() {
+    _cooldownTarget = _CooldownTarget.normalRound;
     _phase = GamePhase.cooldown;
     _phaseController.add(_phase);
 
@@ -345,7 +417,51 @@ class FitFusionGame extends FlameGame {
     _playAudioSafe('sfx/win_violin.mp3');
   }
 
+  void _enterBonusCooldown(int bonusNumber) {
+    _cooldownTarget = _CooldownTarget.beforeBonus;
+    _activeBonusNumber = bonusNumber;
+    _phase = GamePhase.bonusCooldown;
+    _phaseController.add(_phase);
+
+    _paceTimerActive = false;
+    _paceIndicator.setActive(false);
+    _cooldownOverlay.startCooldown(
+      _currentRound + 1,
+      title: 'BONUS $bonusNumber',
+      caption: 'You currently have $_bonusGemsCollected gems collected.',
+      hideWorkoutImage: true,
+      captionAtBottom: true,
+    );
+    _playAudioSafe('sfx/win_violin.mp3');
+  }
+
+  void _enterPostBonusCooldown() {
+    _currentRound++;
+    _monsterMaxHP = repsRequiredForRound(_currentRound);
+    _monsterHP = _monsterMaxHP;
+    _monster.nextMonster();
+    _cooldownTarget = _CooldownTarget.afterBonus;
+    _phase = GamePhase.bonusCooldown;
+    _phaseController.add(_phase);
+
+    _paceTimerActive = false;
+    _paceIndicator.setActive(false);
+    _cooldownOverlay.startCooldown(
+      _currentRound,
+      caption:
+          'Bonus round over, $_bonusGemsCollected seconds deducted on clear time. '
+          'Be sure to finish this session, warrior!',
+    );
+    _playAudioSafe('sfx/win_violin.mp3');
+  }
+
   void _onCooldownComplete() {
+    if (_cooldownTarget == _CooldownTarget.beforeBonus) {
+      _enterBonusPlaying();
+      return;
+    }
+
+    _cooldownTarget = _CooldownTarget.normalRound;
     // Cooldown done — enter playing phase
     _updateHUD();
 
@@ -356,6 +472,28 @@ class FitFusionGame extends FlameGame {
     _paceTimeRemaining = _paceIntervalSeconds;
     _paceTimerActive = true;
     _paceIndicator.setActive(true);
+  }
+
+  void _enterBonusPlaying() {
+    _cooldownTarget = _CooldownTarget.normalRound;
+    _phase = GamePhase.bonusPlaying;
+    _phaseController.add(_phase);
+
+    _bonusTimeRemaining = 15;
+    _bonusTargetMoveTimer = 0;
+    _bonusEnding = false;
+    _bonusEndDelay = 0;
+    _lastBonusSpawnCenter = null;
+    _lastBonusBodyCenter = null;
+    _lastBonusBodyRadius = 0;
+    _paceTimerActive = false;
+    _paceIndicator.configure(maxSeconds: 15);
+    _paceIndicator.setRemaining(_bonusTimeRemaining);
+    _paceIndicator.setActive(true);
+    _repProgress.setCustomText('$_bonusGemsCollected GEMS');
+    _roundBanner.setCustomRoundLabel('BONUS $_activeBonusNumber');
+    _roundBanner.setWorkoutLabel(_workoutType.displayName.toUpperCase());
+    _spawnAllBonusItems();
   }
 
   // --- Internal Game Logic ---
@@ -469,6 +607,8 @@ class FitFusionGame extends FlameGame {
 
     if (_roundWinIsVictory) {
       _handleVictory();
+    } else if (_shouldStartBonusAfterRound(_currentRound)) {
+      _enterBonusCooldown(_currentRound == 4 ? 1 : 2);
     } else {
       // Advance round and enter cooldown
       _currentRound++;
@@ -499,11 +639,18 @@ class FitFusionGame extends FlameGame {
 
     _paceTimerActive = false;
     _cooldownOverlay.stopCooldown();
+    _deactivateBonusItems();
 
     final endTime = DateTime.now();
     final startTime = _sessionStartTime ?? endTime;
-    final durationSeconds =
+    final rawDurationSeconds =
         endTime.difference(startTime).inMilliseconds / 1000.0;
+    final durationSeconds = max(
+      0.0,
+      rawDurationSeconds -
+          _bonusElapsedTotal -
+          (won ? _bonusGemsCollected.toDouble() : 0.0),
+    );
 
     double bestInterval = 0.0;
     double avgInterval = 0.0;
@@ -566,5 +713,240 @@ class FitFusionGame extends FlameGame {
         }());
       }),
     );
+  }
+
+  bool _shouldStartBonusAfterRound(int round) {
+    return _bonusRoundsEnabled && (round == 4 || round == 8);
+  }
+
+  void _updateBonusRound(double dt) {
+    if (_bonusEnding) {
+      _bonusEndDelay -= dt;
+      if (_bonusEndDelay <= 0) {
+        _finishBonusRound();
+      }
+      return;
+    }
+
+    final consumed = min(dt, _bonusTimeRemaining);
+    _bonusTimeRemaining = max(0.0, _bonusTimeRemaining - dt);
+    _bonusElapsedTotal += consumed;
+    _paceIndicator.setRemaining(_bonusTimeRemaining);
+    _bonusTargetMoveTimer += dt;
+
+    if (_bonusTargetMoveTimer >= 2) {
+      _spawnNextBonusTarget(awayFrom: _activeBonusItem()?.centerOffset);
+    }
+
+    if (_bonusTimeRemaining <= 0) {
+      _startBonusEndDelay();
+    }
+  }
+
+  void _handleBonusCollision(Offset handPosition) {
+    if (_bonusEnding) return;
+
+    final touchedItem = _closestCollidingItem(handPosition);
+    if (touchedItem == null) return;
+
+    if (touchedItem.kind == BonusItemKind.poison) {
+      _spawnBonusFeedback(touchedItem.centerOffset, '!');
+      _playAudioSafe('sfx/poison.mp3');
+      _startBonusEndDelay();
+      return;
+    }
+
+    _bonusGemsCollected++;
+    _repProgress.setCustomText('$_bonusGemsCollected GEMS');
+    _spawnBonusFeedback(touchedItem.centerOffset, '+1');
+    _playAudioSafe('sfx/ping.mp3');
+    _spawnNextBonusTarget(awayFrom: handPosition);
+  }
+
+  BonusItemComponent? _closestCollidingItem(Offset handPosition) {
+    const touchRadius = 56.0;
+    BonusItemComponent? closest;
+    double closestDistance = double.infinity;
+
+    for (final item in _bonusItems) {
+      if (!item.isActive) continue;
+      final distance = (item.centerOffset - handPosition).distance;
+      if (distance <= touchRadius + item.size.x * 0.36 &&
+          distance < closestDistance) {
+        closest = item;
+        closestDistance = distance;
+      }
+    }
+
+    return closest;
+  }
+
+  void _finishBonusRound() {
+    if (_phase != GamePhase.bonusPlaying) return;
+    _deactivateBonusItems();
+    _bonusEnding = false;
+    _bonusEndDelay = 0;
+    _paceIndicator.setActive(false);
+    _enterPostBonusCooldown();
+  }
+
+  void _spawnAllBonusItems() {
+    _deactivateBonusItems();
+    _spawnPendingBonusTargetIfReady();
+  }
+
+  void _spawnNextBonusTarget({Offset? awayFrom}) {
+    _deactivateBonusItems();
+    _bonusTargetMoveTimer = 0;
+    final kind = _bonusRandom.nextDouble() < 0.7
+        ? BonusItemKind.gem
+        : BonusItemKind.poison;
+    final item = _bonusItemOfKind(kind);
+    if (item == null) return;
+
+    item.activateAt(_calculatedBonusPosition(item, awayFrom: awayFrom));
+    _lastBonusSpawnCenter = item.centerOffset;
+  }
+
+  void _spawnPendingBonusTargetIfReady() {
+    if (_bonusEnding || _activeBonusItem() != null) return;
+    if (_lastBonusBodyCenter == null) return;
+    _spawnNextBonusTarget();
+  }
+
+  BonusItemComponent? _activeBonusItem() {
+    for (final item in _bonusItems) {
+      if (item.isActive) return item;
+    }
+    return null;
+  }
+
+  void _startBonusEndDelay() {
+    if (_bonusEnding) return;
+    _deactivateBonusItems();
+    _bonusTimeRemaining = 0;
+    _paceIndicator.setRemaining(0);
+    _bonusEnding = true;
+    _bonusEndDelay = 2;
+  }
+
+  BonusItemComponent? _bonusItemOfKind(BonusItemKind kind) {
+    for (final item in _bonusItems) {
+      if (item.kind == kind) return item;
+    }
+    return null;
+  }
+
+  Vector2 _calculatedBonusPosition(
+    BonusItemComponent item, {
+    Offset? awayFrom,
+  }) {
+    final bounds = _bonusSpawnBounds();
+    final itemSize = BonusItemComponent.itemSize;
+    final previousCenter = awayFrom ?? _lastBonusSpawnCenter;
+    final bodyCenter = _lastBonusBodyCenter;
+    final safeBodyDistance = _lastBonusBodyRadius + itemSize * 1.35;
+    final candidates = _bonusPlacementCandidates(bounds, itemSize);
+
+    Offset? best;
+    var bestScore = -double.infinity;
+    for (final candidate in candidates) {
+      if (bodyCenter != null &&
+          (bodyCenter - candidate).distance < safeBodyDistance) {
+        continue;
+      }
+
+      final score = _scoreBonusCandidate(
+        candidate: candidate,
+        previousCenter: previousCenter,
+        bodyCenter: bodyCenter,
+      );
+      if (score > bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+
+    best ??= candidates.reduce((a, b) {
+      final aScore = _scoreBonusCandidate(
+        candidate: a,
+        previousCenter: previousCenter,
+        bodyCenter: bodyCenter,
+      );
+      final bScore = _scoreBonusCandidate(
+        candidate: b,
+        previousCenter: previousCenter,
+        bodyCenter: bodyCenter,
+      );
+      return bScore > aScore ? b : a;
+    });
+
+    return Vector2(best.dx - itemSize / 2, best.dy - itemSize / 2);
+  }
+
+  List<Offset> _bonusPlacementCandidates(Rect bounds, double itemSize) {
+    const fractions = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
+    final candidates = <Offset>[];
+    for (final xFraction in fractions) {
+      for (final yFraction in fractions) {
+        candidates.add(
+          Offset(
+            bounds.left + itemSize / 2 + (bounds.width - itemSize) * xFraction,
+            bounds.top + itemSize / 2 + (bounds.height - itemSize) * yFraction,
+          ),
+        );
+      }
+    }
+    return candidates;
+  }
+
+  double _scoreBonusCandidate({
+    required Offset candidate,
+    required Offset? previousCenter,
+    required Offset? bodyCenter,
+  }) {
+    final previousDistance = previousCenter == null
+        ? 0.0
+        : (candidate - previousCenter).distance;
+    final bodyDistance = bodyCenter == null
+        ? 0.0
+        : (candidate - bodyCenter).distance;
+    final oppositeScore = previousCenter == null || bodyCenter == null
+        ? 0.0
+        : _oppositeSideScore(candidate, previousCenter, bodyCenter);
+    return previousDistance * 1000 + oppositeScore * 500 + bodyDistance;
+  }
+
+  double _oppositeSideScore(
+    Offset candidate,
+    Offset previousCenter,
+    Offset bodyCenter,
+  ) {
+    final previousVector = previousCenter - bodyCenter;
+    final candidateVector = candidate - bodyCenter;
+    final denominator = previousVector.distance * candidateVector.distance;
+    if (denominator <= 1) return 0;
+    final dot =
+        previousVector.dx * candidateVector.dx +
+        previousVector.dy * candidateVector.dy;
+    return (-dot / denominator).clamp(-1.0, 1.0);
+  }
+
+  Rect _bonusSpawnBounds() {
+    return Rect.fromLTRB(24, 132, size.x - 24, max(132.0, size.y - 178));
+  }
+
+  void _deactivateBonusItems() {
+    for (final item in _bonusItems) {
+      item.deactivate();
+    }
+  }
+
+  void _spawnBonusFeedback(Offset position, String text) {
+    final damageNumber = _damageNumberPool.firstWhere(
+      (effect) => !effect.isEffectActive,
+      orElse: () => _damageNumberPool.first,
+    );
+    damageNumber.activateAt(position.dx, position.dy, text: text);
   }
 }

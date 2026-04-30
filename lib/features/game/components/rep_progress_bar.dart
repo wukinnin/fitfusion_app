@@ -8,6 +8,7 @@ class RepProgressBar extends PositionComponent
     with HasGameReference<FitFusionGame> {
   int _reps = 0;
   int _required = 1;
+  String? _customText;
   bool _isDirty = true;
   late RRect _bgRect;
 
@@ -30,9 +31,16 @@ class RepProgressBar extends PositionComponent
   );
 
   void setProgress(int reps, int required) {
-    if (_reps == reps && _required == required) return;
+    if (_reps == reps && _required == required && _customText == null) return;
     _reps = reps;
     _required = required;
+    _customText = null;
+    _isDirty = true;
+  }
+
+  void setCustomText(String text) {
+    if (_customText == text) return;
+    _customText = text;
     _isDirty = true;
   }
 
@@ -40,7 +48,7 @@ class RepProgressBar extends PositionComponent
   void render(Canvas canvas) {
     if (_isDirty) {
       _textPainter.text = TextSpan(
-        text: '$_reps/ $_required REPS',
+        text: _customText ?? '$_reps/ $_required REPS',
         style: _textStyle,
       );
       _textPainter.layout();

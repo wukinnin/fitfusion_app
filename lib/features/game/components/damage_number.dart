@@ -13,23 +13,24 @@ class DamageNumber extends PositionComponent
   bool get isEffectActive => _isActive;
 
   final TextPainter _textPainter = TextPainter(
-    text: const TextSpan(
-      text: '-1',
-      style: TextStyle(
+    textDirection: TextDirection.ltr,
+  );
+
+  void activateAt(double x, double y, {String text = '-1'}) {
+    position.x = x;
+    position.y = y;
+    _elapsed = 0;
+    _isActive = true;
+    _textPainter.text = TextSpan(
+      text: text,
+      style: const TextStyle(
         color: Color(0xFFFFD700),
         fontSize: 32,
         fontWeight: FontWeight.bold,
         shadows: [Shadow(blurRadius: 4, color: Colors.black)],
       ),
-    ),
-    textDirection: TextDirection.ltr,
-  )..layout();
-
-  void activateAt(double x, double y) {
-    position.x = x;
-    position.y = y;
-    _elapsed = 0;
-    _isActive = true;
+    );
+    _textPainter.layout();
   }
 
   @override

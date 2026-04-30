@@ -66,6 +66,8 @@ class AppBgmService {
     'sfx/slash.mp3',
     'sfx/thud.mp3',
     'sfx/damage.mp3',
+    'sfx/ping.mp3',
+    'sfx/poison.mp3',
     'sfx/win_violin.mp3',
     'sfx/victory_orchestra.mp3',
     'sfx/lose_violin.mp3',

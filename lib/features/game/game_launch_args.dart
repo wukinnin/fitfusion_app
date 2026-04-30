@@ -6,6 +6,7 @@ class GameLaunchArgs {
   final bool isMultiplayer;
   final String? player2UserId;
   final String? player2Email;
+  final bool bonusRoundsEnabled;
 
   const GameLaunchArgs({
     required this.workoutType,
@@ -13,5 +14,6 @@ class GameLaunchArgs {
     this.isMultiplayer = false,
     this.player2UserId,
     this.player2Email,
+    this.bonusRoundsEnabled = false,
   });
 }

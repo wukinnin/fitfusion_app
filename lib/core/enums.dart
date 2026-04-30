@@ -12,9 +12,16 @@ enum GamePhase {
   /// Also the initial phase — Round 1 starts with a cooldown.
   cooldown,
 
+  /// Bonus-round transition cooldown. Normal reps and pace failures are paused.
+  bonusCooldown,
+
   /// Active round. Pace timer is running. Reps deal damage.
   /// Pace failures cost lives.
   playing,
+
+  /// Active singleplayer bonus minigame. Pose detection stays on, normal reps
+  /// and lives are paused, and right-hand collisions collect gems.
+  bonusPlaying,
 
   /// Terminal state: all 10 rounds completed with at least 1 life remaining.
   victory,

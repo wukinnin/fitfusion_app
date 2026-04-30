@@ -7,6 +7,7 @@ import '../fitfusion_game.dart';
 class RoundBanner extends PositionComponent
     with HasGameReference<FitFusionGame> {
   int _round = 1;
+  String? _customRoundLabel;
   String _workoutLabel = '';
   bool _roundDirty = true;
   bool _workoutDirty = true;
@@ -31,8 +32,15 @@ class RoundBanner extends PositionComponent
   );
 
   void setRound(int round) {
-    if (_round == round) return;
+    if (_round == round && _customRoundLabel == null) return;
     _round = round;
+    _customRoundLabel = null;
+    _roundDirty = true;
+  }
+
+  void setCustomRoundLabel(String label) {
+    if (_customRoundLabel == label) return;
+    _customRoundLabel = label;
     _roundDirty = true;
   }
 
@@ -47,7 +55,10 @@ class RoundBanner extends PositionComponent
     final screenW = game.size.x;
 
     if (_roundDirty) {
-      _roundPainter.text = TextSpan(text: 'ROUND $_round', style: _roundStyle);
+      _roundPainter.text = TextSpan(
+        text: _customRoundLabel ?? 'ROUND $_round',
+        style: _roundStyle,
+      );
       _roundPainter.layout();
       _roundDirty = false;
     }

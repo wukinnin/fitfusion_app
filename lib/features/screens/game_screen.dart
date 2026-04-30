@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flame/game.dart';
 import 'package:flutter/foundation.dart';
@@ -24,6 +25,7 @@ import '../motion/camera_service.dart';
 import '../motion/mediapipe_multiplayer_pose_service.dart';
 import '../motion/pace_monitor.dart';
 import '../motion/pose_detector_service.dart';
+import '../motion/pose_screen_mapper.dart';
 import '../motion/rep_detector.dart';
 
 class GameScreen extends StatefulWidget {
@@ -93,11 +95,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _launchArgs = GameLaunchArgs(
         workoutType: _workoutType,
         cooldownSeconds: _cooldownSeconds,
+        bonusRoundsEnabled: false,
       );
     } else {
       _launchArgs = GameLaunchArgs(
         workoutType: _workoutType,
         cooldownSeconds: _cooldownSeconds,
+        bonusRoundsEnabled: false,
       );
     }
 
@@ -110,6 +114,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         isMultiplayer: true,
         player2UserId: _launchArgs?.player2UserId,
         player2Email: _launchArgs?.player2Email,
+        bonusRoundsEnabled: false,
+      );
+    } else if (_launchArgs?.isMultiplayer == true &&
+        _launchArgs?.bonusRoundsEnabled == true) {
+      _launchArgs = GameLaunchArgs(
+        workoutType: _workoutType,
+        cooldownSeconds: _cooldownSeconds,
+        isMultiplayer: true,
+        player2UserId: _launchArgs?.player2UserId,
+        player2Email: _launchArgs?.player2Email,
+        bonusRoundsEnabled: false,
       );
     }
 
@@ -211,6 +226,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           player1RepDetector: _player1RepDetector,
           player2RepDetector: _player2RepDetector,
           isMultiplayer: _isMultiplayer,
+          bonusPoseStream: _isMultiplayer
+              ? null
+              : _poseDetectorService.poseStream,
+          bonusPoseMapper: _bonusPoseSnapshotForPose,
         );
       }
 
@@ -377,6 +396,64 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     } else {
       _poseDetectorService.setEnabled(enabled);
     }
+  }
+
+  BonusPoseSnapshot? _bonusPoseSnapshotForPose(Pose pose) {
+    final wrist = pose.landmarks[PoseLandmarkType.rightWrist];
+    final previewSize = _cameraService.controller?.value.previewSize;
+    final gameSize = _game?.size;
+    if (wrist == null || previewSize == null || gameSize == null) return null;
+    if (wrist.likelihood < kLandmarkLikelihoodThreshold) return null;
+
+    final canvasSize = Size(gameSize.x, gameSize.y);
+    Offset mapLandmark(PoseLandmark landmark) {
+      return transformPosePointToScreen(
+        x: landmark.x,
+        y: landmark.y,
+        inputImageSize: previewSize,
+        canvasSize: canvasSize,
+        lensDirection: _cameraService.lensDirection,
+        sensorOrientation: _cameraService.sensorOrientation,
+      );
+    }
+
+    final bodyPoints = <Offset>[];
+    for (final type in const [
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.leftElbow,
+      PoseLandmarkType.rightElbow,
+      PoseLandmarkType.leftWrist,
+      PoseLandmarkType.rightWrist,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.rightKnee,
+      PoseLandmarkType.leftAnkle,
+      PoseLandmarkType.rightAnkle,
+    ]) {
+      final landmark = pose.landmarks[type];
+      if (landmark == null ||
+          landmark.likelihood < kLandmarkLikelihoodThreshold) {
+        continue;
+      }
+      bodyPoints.add(mapLandmark(landmark));
+    }
+
+    if (bodyPoints.length < 4) return null;
+
+    final bodyCenter =
+        bodyPoints.reduce((a, b) => a + b) / bodyPoints.length.toDouble();
+    var bodyRadius = 0.0;
+    for (final point in bodyPoints) {
+      bodyRadius = math.max(bodyRadius, (point - bodyCenter).distance);
+    }
+
+    return BonusPoseSnapshot(
+      handPosition: mapLandmark(wrist),
+      bodyCenter: bodyCenter,
+      bodyRadius: bodyRadius + 48,
+    );
   }
 
   Future<void> _shutdownStep(
