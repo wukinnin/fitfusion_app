@@ -33,6 +33,8 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
   bool _argsParsed = false;
   bool _bonusRounds = false;
 
+  bool get _showBonusRoundsOption => !_isMultiplayer;
+
   void _parseArgs() {
     if (_argsParsed) return;
     _argsParsed = true;
@@ -187,64 +189,7 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // Bonus Rounds are a singleplayer-only feature; the
-                    // multiplayer flow disables them server-side in
-                    // _launchGame and GameScreen, so we also hide the toggle
-                    // here to avoid presenting an option that does nothing.
-                    if (!_isMultiplayer) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.midnightNavy.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.gold, width: 1.5),
-                        ),
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: _bonusRounds,
-                              onChanged: (v) =>
-                                  setState(() => _bonusRounds = v ?? false),
-                              activeColor: AppTheme.gold,
-                              checkColor: AppTheme.bloodRed,
-                              side: const BorderSide(
-                                color: AppTheme.gold,
-                                width: 1.5,
-                              ),
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'BONUS ROUNDS',
-                                    style: GoogleFonts.cinzel(
-                                      color: AppTheme.gold,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Minigames after rounds 4 and 8',
-                                    style: GoogleFonts.cinzel(
-                                      color: AppTheme.creamWhite.withValues(
-                                        alpha: 0.7,
-                                      ),
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                    if (_showBonusRoundsOption) _buildBonusRoundsCard(),
                     const SizedBox(height: 36),
                     SizedBox(
                       height: 64,
@@ -273,6 +218,52 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBonusRoundsCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.midnightNavy.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.gold, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Checkbox(
+            value: _bonusRounds,
+            onChanged: (v) => setState(() => _bonusRounds = v ?? false),
+            activeColor: AppTheme.gold,
+            checkColor: AppTheme.bloodRed,
+            side: const BorderSide(color: AppTheme.gold, width: 1.5),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'BONUS ROUNDS',
+                  style: GoogleFonts.cinzel(
+                    color: AppTheme.gold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Minigames after rounds 4 and 8',
+                  style: GoogleFonts.cinzel(
+                    color: AppTheme.creamWhite.withValues(alpha: 0.7),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

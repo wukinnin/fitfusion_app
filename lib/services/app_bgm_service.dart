@@ -60,8 +60,8 @@ class AppBgmService {
   static final AppBgmService instance = AppBgmService._();
 
   static const String _menuTrack = 'music/menu.mp3';
-  static const List<String> _preloadAudio = [
-    _menuTrack,
+  static const List<String> _menuAudio = [_menuTrack];
+  static const List<String> _gameplayAudio = [
     'sfx/achievement.mp3',
     'sfx/slash.mp3',
     'sfx/thud.mp3',
@@ -77,8 +77,11 @@ class AppBgmService {
   bool _initialized = false;
   bool _isMenuPlaying = false;
   int _syncToken = 0;
+  int _gameplayCacheToken = 0;
   String? _currentRouteName;
   double _globalVolume = 1.0;
+  bool _gameplayAudioLoaded = false;
+  Future<void>? _gameplayAudioLoadFuture;
 
   double get globalVolume => _globalVolume;
 
@@ -88,7 +91,7 @@ class AppBgmService {
     final prefs = await SharedPreferences.getInstance();
     _globalVolume = prefs.getDouble(_volumePreferenceKey) ?? 1.0;
     await FlameAudio.bgm.initialize();
-    await FlameAudio.audioCache.loadAll(_preloadAudio);
+    await FlameAudio.audioCache.loadAll(_menuAudio);
     _queueMenuSync();
   }
 
@@ -109,10 +112,62 @@ class AppBgmService {
     await FlameAudio.play(file, volume: effectiveVolume);
   }
 
+  Future<void> loadGameplayAudio() {
+    if (_gameplayAudioLoaded) return Future.value();
+    _gameplayAudioLoadFuture ??= _loadGameplayAudioInternal();
+    return _gameplayAudioLoadFuture!;
+  }
+
+  Future<void> _loadGameplayAudioInternal() async {
+    try {
+      await FlameAudio.audioCache.loadAll(_gameplayAudio);
+      _gameplayAudioLoaded = true;
+      if (!_isGameplayAudioRoute(_currentRouteName)) {
+        _queueGameplayAudioUnload();
+      }
+    } catch (e) {
+      assert(() {
+        debugPrint('[AppBgmService] Failed to load gameplay audio: $e');
+        return true;
+      }());
+    } finally {
+      _gameplayAudioLoadFuture = null;
+    }
+  }
+
+  void _queueGameplayAudioUnload() {
+    if (!_gameplayAudioLoaded) return;
+    final token = ++_gameplayCacheToken;
+    unawaited(_unloadGameplayAudioAfterSettling(token));
+  }
+
+  Future<void> _unloadGameplayAudioAfterSettling(int token) async {
+    // Let one-shot result sounds finish and avoid fighting quick retry taps.
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (token != _gameplayCacheToken) return;
+    if (_isGameplayAudioRoute(_currentRouteName)) return;
+
+    try {
+      await Future.wait(_gameplayAudio.map(FlameAudio.audioCache.clear));
+      _gameplayAudioLoaded = false;
+    } catch (e) {
+      assert(() {
+        debugPrint('[AppBgmService] Failed to unload gameplay audio: $e');
+        return true;
+      }());
+    }
+  }
+
   void syncForRoute(String? routeName) {
     if (!_initialized) return;
 
     _currentRouteName = routeName;
+    if (_isGameplayAudioRoute(routeName)) {
+      _gameplayCacheToken++;
+      unawaited(loadGameplayAudio());
+    } else {
+      _queueGameplayAudioUnload();
+    }
     _queueMenuSync();
   }
 
@@ -158,4 +213,8 @@ class AppBgmService {
   }
 
   bool _isCurrentSync(int token) => token == _syncToken;
+
+  bool _isGameplayAudioRoute(String? routeName) {
+    return routeName == '/game' || routeName == '/results';
+  }
 }

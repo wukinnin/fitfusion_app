@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
 import '../../core/enums.dart';
 import '../../core/theme.dart';
+import '../../services/app_bgm_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/session_service.dart';
 import '../knight/knight_service.dart';
@@ -171,6 +172,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (_isDisposed || !mounted) return;
 
       await _achievementService.init();
+      if (_isDisposed || !mounted) return;
+
+      await AppBgmService.instance.loadGameplayAudio();
       if (_isDisposed || !mounted) return;
 
       await _cameraService.initialize();

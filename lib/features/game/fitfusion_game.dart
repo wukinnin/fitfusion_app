@@ -138,14 +138,14 @@ class FitFusionGame extends FlameGame {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    await images.loadAll([
+    final imageFiles = [
       ...MonsterComponent.monsterFiles,
       'game/squats.png',
       'game/jumping-jacks.png',
       'game/side-crunches.png',
-      'game/diamond.png',
-      'game/poison.png',
-    ]);
+      if (_bonusRoundsEnabled) ...['game/diamond.png', 'game/poison.png'],
+    ];
+    await images.loadAll(imageFiles);
 
     // === TOP HUD LAYOUT ===
     // Row 1: Health bar — full width, near top
@@ -186,17 +186,19 @@ class FitFusionGame extends FlameGame {
       ..onCooldownComplete = _onCooldownComplete;
     add(_cooldownOverlay);
 
-    final gemSprite = Sprite(images.fromCache('game/diamond.png'));
-    final poisonSprite = Sprite(images.fromCache('game/poison.png'));
-    final gemItem = BonusItemComponent(kind: BonusItemKind.gem)
-      ..sprite = gemSprite;
-    _bonusItems.add(gemItem);
-    add(gemItem);
+    if (_bonusRoundsEnabled) {
+      final gemSprite = Sprite(images.fromCache('game/diamond.png'));
+      final poisonSprite = Sprite(images.fromCache('game/poison.png'));
+      final gemItem = BonusItemComponent(kind: BonusItemKind.gem)
+        ..sprite = gemSprite;
+      _bonusItems.add(gemItem);
+      add(gemItem);
 
-    final poisonItem = BonusItemComponent(kind: BonusItemKind.poison)
-      ..sprite = poisonSprite;
-    _bonusItems.add(poisonItem);
-    add(poisonItem);
+      final poisonItem = BonusItemComponent(kind: BonusItemKind.poison)
+        ..sprite = poisonSprite;
+      _bonusItems.add(poisonItem);
+      add(poisonItem);
+    }
 
     for (var i = 0; i < 6; i++) {
       final slash = SwordSlashComponent();

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
@@ -59,8 +61,17 @@ class _ResultsScreenState extends State<ResultsScreen>
     final session = _session;
     if (_audioPlayed || session == null) return;
     _audioPlayed = true;
-    AppBgmService.instance.playSfx(
-      session.won ? 'sfx/victory_orchestra.mp3' : 'sfx/lose_violin.mp3',
+    unawaited(
+      AppBgmService.instance
+          .playSfx(
+            session.won ? 'sfx/victory_orchestra.mp3' : 'sfx/lose_violin.mp3',
+          )
+          .catchError((Object e) {
+            assert(() {
+              debugPrint('[ResultsScreen] Audio error: $e');
+              return true;
+            }());
+          }),
     );
   }
 
