@@ -105,9 +105,12 @@ class MainActivity : FlutterActivity() {
             .setBaseOptions(baseOptions)
             .setRunningMode(RunningMode.LIVE_STREAM)
             .setNumPoses(2)
-            .setMinPoseDetectionConfidence(0.5f)
-            .setMinPosePresenceConfidence(0.5f)
-            .setMinTrackingConfidence(0.5f)
+            // Lowered from 0.5 so the second body — typically partially
+            // occluded or at the edge of the frame in multiplayer — is not
+            // rejected by the native detector before it reaches Dart.
+            .setMinPoseDetectionConfidence(0.3f)
+            .setMinPosePresenceConfidence(0.3f)
+            .setMinTrackingConfidence(0.3f)
             .setResultListener(this::onPoseResult)
             .setErrorListener { error -> finishPendingWithError("MediaPipeError", error.toString()) }
             .build()

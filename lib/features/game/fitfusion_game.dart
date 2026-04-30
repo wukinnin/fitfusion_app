@@ -449,8 +449,7 @@ class FitFusionGame extends FlameGame {
     _cooldownOverlay.startCooldown(
       _currentRound,
       caption:
-          'Bonus round over, $_bonusGemsCollected seconds deducted on clear time. '
-          'Be sure to finish this session, warrior!',
+          'Great Job! -$_bonusGemsCollected seconds deducted to your clear time!',
     );
     _playAudioSafe('sfx/win_violin.mp3');
   }
@@ -645,11 +644,14 @@ class FitFusionGame extends FlameGame {
     final startTime = _sessionStartTime ?? endTime;
     final rawDurationSeconds =
         endTime.difference(startTime).inMilliseconds / 1000.0;
+    final clearTimeBeforeBonusDeductionSeconds = max(
+      0.0,
+      rawDurationSeconds - _bonusElapsedTotal,
+    );
+    final bonusSecondsDeducted = won ? _bonusGemsCollected : 0;
     final durationSeconds = max(
       0.0,
-      rawDurationSeconds -
-          _bonusElapsedTotal -
-          (won ? _bonusGemsCollected.toDouble() : 0.0),
+      clearTimeBeforeBonusDeductionSeconds - bonusSecondsDeducted.toDouble(),
     );
 
     double bestInterval = 0.0;
@@ -667,6 +669,10 @@ class FitFusionGame extends FlameGame {
       totalReps: _totalReps,
       totalRepsRequired: kTotalSessionReps,
       totalTimeSeconds: durationSeconds,
+      clearTimeBeforeBonusDeductionSeconds:
+          clearTimeBeforeBonusDeductionSeconds,
+      bonusGemsCollected: _bonusGemsCollected,
+      bonusSecondsDeducted: bonusSecondsDeducted,
       roundsCompleted: _roundsCompleted,
       bestRepIntervalSeconds: bestInterval,
       avgRepIntervalSeconds: avgInterval,

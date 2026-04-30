@@ -7,6 +7,13 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../core/constants.dart';
 import 'pose_detector_service.dart';
 
+class _SortedPose {
+  final Pose pose;
+  final double centerX;
+
+  const _SortedPose({required this.pose, required this.centerX});
+}
+
 class MediaPipeMultiplayerPoseService {
   static const MethodChannel _channel = MethodChannel(
     'fitfusion/mediapipe_pose',
@@ -146,27 +153,39 @@ class MediaPipeMultiplayerPoseService {
     Size imageSize,
     CameraDescription camera,
   ) {
-    Pose? player1;
-    Pose? player2;
-    double? player1CenterX;
-    double? player2CenterX;
+    // Sort all detected bodies left-to-right on the preview. With MediaPipe
+    // configured for numPoses=2, we want to always surface BOTH bodies when
+    // two are detected — assigning the leftmost to Player 1 and the rightmost
+    // to Player 2 regardless of where the midpoint lands. A strict
+    // "centerX < 0.5 → P1, else P2" split used to drop one body when both
+    // players happened to stand on the same half of the frame.
+    final sorted =
+        poses.map((pose) {
+            return _SortedPose(
+              pose: pose,
+              centerX: _bodyCenterXOnPreview(pose, imageSize, camera),
+            );
+          }).toList(growable: false)
+          ..sort((a, b) => a.centerX.compareTo(b.centerX));
 
-    for (final pose in poses) {
-      final centerX = _bodyCenterXOnPreview(pose, imageSize, camera);
-      if (centerX < 0.5) {
-        if (player1CenterX == null || centerX > player1CenterX) {
-          player1 = pose;
-          player1CenterX = centerX;
-        }
-      } else {
-        if (player2CenterX == null || centerX < player2CenterX) {
-          player2 = pose;
-          player2CenterX = centerX;
-        }
-      }
+    if (sorted.isEmpty) {
+      _publishPoses(null, null);
+      return;
     }
 
-    _publishPoses(player1, player2);
+    if (sorted.length == 1) {
+      // Only one body visible — keep it on the lane it physically occupies so
+      // the correct player's rep detector receives it.
+      final only = sorted.first;
+      if (only.centerX < 0.5) {
+        _publishPoses(only.pose, null);
+      } else {
+        _publishPoses(null, only.pose);
+      }
+      return;
+    }
+
+    _publishPoses(sorted.first.pose, sorted.last.pose);
   }
 
   void _publishPoses(Pose? player1, Pose? player2) {
@@ -186,10 +205,17 @@ class MediaPipeMultiplayerPoseService {
       PoseLandmarkType.rightHip,
     ];
 
+    // In multiplayer, the second body is often partially occluded or at the
+    // edge of the frame, which drags MediaPipe's visibility scores below the
+    // strict singleplayer threshold. Use the more forgiving multiplayer
+    // threshold so we don't discard an otherwise valid second body and
+    // collapse to a single-player feed.
     for (final type in criticalLandmarks) {
       final landmark = pose.landmarks[type];
       if (landmark == null) return false;
-      if (landmark.likelihood < kLandmarkLikelihoodThreshold) return false;
+      if (landmark.likelihood < kMultiplayerRepLandmarkLikelihoodThreshold) {
+        return false;
+      }
     }
     return true;
   }

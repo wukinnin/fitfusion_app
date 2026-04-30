@@ -105,6 +105,7 @@ class P2VerificationService {
     }
 
     String? p2UserId;
+    String? p2RefreshToken;
     Object? caught;
 
     try {
@@ -115,6 +116,16 @@ class P2VerificationService {
         type: OtpType.email,
       );
       p2UserId = response.user?.id ?? _client.auth.currentUser?.id;
+      // Snapshot P2's refresh token BEFORE we swap the global session back
+      // to P1. The token outlives the swap (Supabase only invalidates it on
+      // first reuse) and lets the SessionService spin up a transient
+      // P2-authenticated client at end-of-session to insert P2's row
+      // without tripping `sessions_insert_own` RLS. Captured even on the
+      // off-chance the response itself omits it (fall back to the live
+      // currentSession which `verifyOTP` has already swapped to P2).
+      p2RefreshToken =
+          response.session?.refreshToken ??
+          _client.auth.currentSession?.refreshToken;
       if (p2UserId == null) {
         throw const P2VerificationException(
           'Verification did not return a user. Please try again.',
@@ -153,6 +164,7 @@ class P2VerificationService {
     P2SessionCache.instance.recordVerified(
       email: email,
       userId: p2UserId!,
+      refreshToken: p2RefreshToken,
     );
     return p2UserId;
   }

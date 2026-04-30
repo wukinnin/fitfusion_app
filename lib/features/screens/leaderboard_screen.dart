@@ -73,7 +73,45 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   Future<void> _fetchAll() async {
     try {
-      final sessionRows = await _client
+      // ── Singleplayer per-workout leaderboards ──
+      //
+      // We pull from the global PB views (v_top10_clear_time and
+      // v_top10_best_rep_interval) instead of querying public.sessions
+      // directly. Reading public.sessions client-side is bound by the
+      // sessions_select_own RLS policy, so a regular player would only ever
+      // see their own runs ranked against themselves. The views are owned
+      // by the schema admin and bypass RLS, exposing the global top-10 to
+      // every authenticated user.
+      final clearTimeRows = await _client
+          .from('v_top10_clear_time')
+          .select('workout_type, username, value, rank');
+      final bestRepIntervalRows = await _client
+          .from('v_top10_best_rep_interval')
+          .select('workout_type, username, value, rank');
+
+      for (int tab = 0; tab < 3; tab++) {
+        final dbKey = _workoutDbKeys[tab];
+        _cache[_cacheKey(tab, 0, 0)] = _rowsForWorkout(
+          clearTimeRows as List,
+          dbKey,
+        );
+        _cache[_cacheKey(tab, 1, 0)] = _rowsForWorkout(
+          bestRepIntervalRows as List,
+          dbKey,
+        );
+      }
+
+      // ── Multiplayer per-workout leaderboards ──
+      //
+      // Multiplayer entries are reconstructed by pairing two sessions rows
+      // that share an identical stats tuple (see _multiplayerPairKey). This
+      // path remains in place but is currently always empty until the
+      // multiplayer save flow can persist Player 2's row (RLS blocks the
+      // current implementation). The query itself is still RLS-bound so
+      // even once Player 2 saves are working the pair will only be
+      // detected on the players' own devices — global multiplayer ranking
+      // requires a separate view to bypass RLS.
+      final ownSessions = await _client
           .from('sessions')
           .select(
             'id, user_id, workout_type, won, rounds_completed, total_reps, '
@@ -85,26 +123,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           .order('completed_at', ascending: false)
           .limit(500);
 
-      final workoutRows = (sessionRows as List)
+      final ownSessionsList = (ownSessions as List)
           .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
           .toList();
-      final grouped = _groupWorkoutSessions(workoutRows);
+      final grouped = _groupWorkoutSessions(ownSessionsList);
 
       for (int tab = 0; tab < 3; tab++) {
         final dbKey = _workoutDbKeys[tab];
-
-        _cache[_cacheKey(tab, 0, 0)] = _rankRows(
-          grouped.singleplayer
-              .where((r) => r['workout_type'] == dbKey)
-              .toList(),
-          metricKey: 'total_time_seconds',
-        );
-        _cache[_cacheKey(tab, 1, 0)] = _rankRows(
-          grouped.singleplayer
-              .where((r) => r['workout_type'] == dbKey)
-              .toList(),
-          metricKey: 'best_rep_interval_seconds',
-        );
         _cache[_cacheKey(tab, 0, 1)] = _rankRows(
           grouped.multiplayer.where((r) => r['workout_type'] == dbKey).toList(),
           metricKey: 'total_time_seconds',
@@ -115,7 +140,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         );
       }
 
-      // Fetch lifetime leaderboards
+      // ── Lifetime leaderboards (already global via SECURITY DEFINER views) ──
       final repsRows = await _client.from('v_top10_lifetime_reps').select();
       _cache[_cacheKey(3, 0, 0)] = List<Map<String, dynamic>>.from(
         (repsRows as List)
@@ -137,6 +162,26 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     }
 
     if (mounted) setState(() => _loading = false);
+  }
+
+  /// Filters one of the v_top10_* per-workout view payloads down to a single
+  /// workout type and normalises it into the shape expected by
+  /// [_buildLeaderboardTable]: `{rank, username, value}`.
+  List<Map<String, dynamic>> _rowsForWorkout(List rows, String workoutDbKey) {
+    final filtered =
+        rows
+            .cast<Map<String, dynamic>>()
+            .where((row) => row['workout_type'] == workoutDbKey)
+            .map((row) {
+              return <String, dynamic>{
+                'rank': (row['rank'] as num).toInt(),
+                'username': row['username'] ?? '--',
+                'value': _asDouble(row['value']),
+              };
+            })
+            .toList()
+          ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
+    return filtered;
   }
 
   _GroupedWorkoutRows _groupWorkoutSessions(List<Map<String, dynamic>> rows) {
