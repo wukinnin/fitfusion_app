@@ -53,7 +53,11 @@ class _CooldownSelectScreenState extends State<CooldownSelectScreen> {
     // Respect the user's "Show Tutorial at Startup" preference right before
     // the session begins. The popup itself reads the pref from Supabase and
     // will no-op (invoking onConfirm directly) if the toggle is off.
-    showWorkoutTutorialIfNeeded(context, onConfirm: _launchGame);
+    showWorkoutTutorialIfNeeded(
+      context,
+      isMultiplayer: _isMultiplayer,
+      onConfirm: _launchGame,
+    );
   }
 
   void _launchGame() {

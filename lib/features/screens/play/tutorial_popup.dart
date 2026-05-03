@@ -13,6 +13,7 @@ import '../../../core/theme.dart';
 /// the sheet.
 Future<void> showWorkoutTutorialIfNeeded(
   BuildContext context, {
+  bool isMultiplayer = false,
   required VoidCallback onConfirm,
 }) async {
   final client = Supabase.instance.client;
@@ -40,7 +41,11 @@ Future<void> showWorkoutTutorialIfNeeded(
   }
 
   if (!context.mounted) return;
-  await _showTutorialBottomSheet(context, onConfirm);
+  await _showTutorialBottomSheet(
+    context,
+    isMultiplayer: isMultiplayer,
+    onConfirm: onConfirm,
+  );
 }
 
 Future<void> _updateShowTutorial(bool value) async {
@@ -58,10 +63,14 @@ Future<void> _updateShowTutorial(bool value) async {
 }
 
 Future<void> _showTutorialBottomSheet(
-  BuildContext context,
-  VoidCallback onConfirm,
-) {
+  BuildContext context, {
+  required bool isMultiplayer,
+  required VoidCallback onConfirm,
+}) {
   bool checkboxValue = true;
+  final tutorialSections = isMultiplayer
+      ? _multiplayerTutorialSections
+      : _singleplayerTutorialSections;
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -106,13 +115,8 @@ Future<void> _showTutorialBottomSheet(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _tutorialSteps
-                          .asMap()
-                          .entries
-                          .map(
-                            (entry) =>
-                                _buildTutorialStep(entry.key + 1, entry.value),
-                          )
+                      children: tutorialSections
+                          .map((section) => _buildTutorialSection(section))
                           .toList(),
                     ),
                   ),
@@ -200,29 +204,40 @@ Future<void> _showTutorialBottomSheet(
   );
 }
 
-Widget _buildTutorialStep(int number, String text) {
+Widget _buildTutorialSection(_TutorialSection section) {
   return Padding(
-    padding: const EdgeInsets.only(bottom: 14),
+    padding: const EdgeInsets.only(bottom: 18),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          section.title,
+          style: GoogleFonts.cinzel(
+            color: AppTheme.gold,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...section.steps.map(_buildTutorialStep),
+      ],
+    ),
+  );
+}
+
+Widget _buildTutorialStep(String text) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 28,
-          height: 28,
+          width: 8,
+          height: 8,
+          margin: const EdgeInsets.only(top: 6),
           decoration: BoxDecoration(
-            color: AppTheme.gold.withValues(alpha: 0.15),
+            color: AppTheme.gold,
             shape: BoxShape.circle,
-            border: Border.all(color: AppTheme.gold, width: 1.5),
-          ),
-          child: Center(
-            child: Text(
-              '$number',
-              style: GoogleFonts.cinzel(
-                color: AppTheme.gold,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -241,16 +256,47 @@ Widget _buildTutorialStep(int number, String text) {
   );
 }
 
-const List<String> _tutorialSteps = [
-  '10 rounds await — each with a monster that you must defeat.',
-  'You must defeat all 10 monsters by doing your chosen workout properly.',
-  'Each rep you perform deals damage to the monster.',
-  'Do enough reps as needed, and keep a good pace to continuously deal damage and defeat the monster.',
-  'The amount of reps needed increase the more you progress per round.',
-  'Consistently deal damage! The monster attacks you if you fail to do at least 1 rep within 5 seconds of each other.',
-  'You are given only 3 lives for failing to keep pace, and cannot be replenished once lost.',
-  'The game ends when you defeat all 10 monsters or lose all 3 lives.',
-  'Before and after every round, the player is given a brief 15 second cooldown period to recover.',
-  'Attempting to pause or halt the game session will immediately trigger a game over. The entire game is a hands-free experience.',
-  'The game session ends with victory when you slay all 10 monsters, or defeat if you lose all 3 lives.',
+class _TutorialSection {
+  const _TutorialSection({required this.title, required this.steps});
+
+  final String title;
+  final List<String> steps;
+}
+
+const List<_TutorialSection> _singleplayerTutorialSections = [
+  _TutorialSection(
+    title: 'MAIN GAME',
+    steps: [
+      'A scary dragon awaits. You must slay it.',
+      'You are going to have to slay the beast by way of working out!',
+      'Each rep you perform deals damage to the monster.',
+      '10 grueling rounds lie ahead to test your stamina, and finally slay the dragon.',
+      "Try not to get slain yourself! Don't fall behind the pace.",
+      "You only get 3 lives to pace yourself, if you fail, it's game over!",
+    ],
+  ),
+  _TutorialSection(
+    title: 'BONUS ROUND',
+    steps: [
+      'Use your right hand to collect as many diamonds possible before time expires.',
+      'The gems collected will cut your clear time by 1 second.',
+      'If you touch the poison, the bonus round is over.',
+      "Don't worry! Your session will still continue regardless.",
+    ],
+  ),
+];
+
+const List<_TutorialSection> _multiplayerTutorialSections = [
+  _TutorialSection(
+    title: 'MAIN GAME',
+    steps: [
+      'A scary dragon awaits. You must slay it.',
+      'You are going to have to slay the beast by way of working out!',
+      'But not without the power of friendship! You must work out together!',
+      'You perform each rep together as one to deal damage to the monster.',
+      '10 grueling rounds lie ahead to test your stamina, to finally slay the dragon.',
+      "Try not to get slain yourselves! Don't fall behind the pace, and don't leave each other behind.",
+      "You both only share 3 lives to pace yourself, if you fail, it's game over!",
+    ],
+  ),
 ];
