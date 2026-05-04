@@ -66,8 +66,8 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                     )
                   : Column(
                       children: [
-                        Expanded(child: _buildAchievementsList()),
                         const UserProfileFooter(),
+                        Expanded(child: _buildAchievementsList()),
                       ],
                     ),
             ),

@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../fitfusion_game.dart';
 
-class MonsterHealthBar extends PositionComponent with HasGameReference<FitFusionGame> {
+class MonsterHealthBar extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   static const double barHeight = 22;
   static const double borderWidth = 3;
 
@@ -15,25 +16,45 @@ class MonsterHealthBar extends PositionComponent with HasGameReference<FitFusion
     ..style = PaintingStyle.stroke
     ..strokeWidth = borderWidth;
   final Paint _fillPaint = Paint()..color = const Color(0xFFB71C1C);
+  double _cachedBarWidth = -1;
+  double _cachedFillWidth = -1;
+  late RRect _bgRRect;
+  RRect? _fillRRect;
 
   void setHP(int current, int max) {
-    _displayedFraction = max > 0 ? current / max : 0.0;
+    final nextFraction = max > 0 ? current / max : 0.0;
+    if (_displayedFraction == nextFraction) return;
+    _displayedFraction = nextFraction;
+    _cachedFillWidth = -1;
   }
 
   @override
   void render(Canvas canvas) {
+    if (game.isBonusMode) return;
+
     final barWidth = game.size.x - 24;
-    final bgRect = Rect.fromLTWH(0, 0, barWidth, barHeight);
-    final rrect = RRect.fromRectAndRadius(bgRect, const Radius.circular(4));
-    canvas.drawRRect(rrect, _bgPaint);
+    if (_cachedBarWidth != barWidth) {
+      _cachedBarWidth = barWidth;
+      _bgRRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, barWidth, barHeight),
+        const Radius.circular(4),
+      );
+      _cachedFillWidth = -1;
+    }
+    canvas.drawRRect(_bgRRect, _bgPaint);
 
     final fillWidth = barWidth * _displayedFraction.clamp(0.0, 1.0);
     if (fillWidth > 0) {
-      final fillRect = Rect.fromLTWH(0, 0, fillWidth, barHeight);
-      final fillRRect = RRect.fromRectAndRadius(fillRect, const Radius.circular(4));
-      canvas.drawRRect(fillRRect, _fillPaint);
+      if (_cachedFillWidth != fillWidth) {
+        _cachedFillWidth = fillWidth;
+        _fillRRect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, 0, fillWidth, barHeight),
+          const Radius.circular(4),
+        );
+      }
+      canvas.drawRRect(_fillRRect!, _fillPaint);
     }
 
-    canvas.drawRRect(rrect, _borderPaint);
+    canvas.drawRRect(_bgRRect, _borderPaint);
   }
 }

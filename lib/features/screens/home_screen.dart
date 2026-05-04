@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../widgets/fitfusion_animated_background.dart';
-import '../../widgets/user_profile_footer.dart';
+import '../knight/knight_card.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
     return Scaffold(
       backgroundColor: AppTheme.bloodRed,
       body: FitFusionAnimatedBackground(
@@ -22,22 +24,18 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Logo
-                        Image.asset(
-                          'assets/images/game/logo.png',
-                          height: 140,
-                          fit: BoxFit.contain,
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Exercise is the Gameplay',
-                          style: TextStyle(
-                            color: AppTheme.creamWhite.withValues(alpha: 0.7),
-                            fontSize: 14,
-                            fontStyle: FontStyle.italic,
+                        // Fitness Knight avatar + speech bubble
+                        if (userId != null)
+                          KnightCard(userId: userId)
+                        else
+                          Image.asset(
+                            'assets/images/game/logo.png',
+                            height: 140,
+                            cacheWidth: 420,
+                            cacheHeight: 420,
+                            fit: BoxFit.contain,
                           ),
-                        ),
-                        const SizedBox(height: 64),
+                        const SizedBox(height: 32),
 
                         // Play button — primary
                         SizedBox(
@@ -45,7 +43,7 @@ class HomeScreen extends StatelessWidget {
                           height: 60,
                           child: ElevatedButton(
                             onPressed: () =>
-                                Navigator.pushNamed(context, '/select'),
+                                Navigator.pushNamed(context, '/select/mode'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.gold,
                               foregroundColor: AppTheme.bloodRed,
@@ -64,13 +62,13 @@ class HomeScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
 
-                        // Leaderboard button
+                        // Performance hub button
                         SizedBox(
                           width: double.infinity,
                           height: 50,
                           child: OutlinedButton(
                             onPressed: () =>
-                                Navigator.pushNamed(context, '/leaderboard'),
+                                Navigator.pushNamed(context, '/performance'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppTheme.gold,
                               side: const BorderSide(
@@ -82,63 +80,7 @@ class HomeScreen extends StatelessWidget {
                               ),
                             ),
                             child: const Text(
-                              'LEADERBOARD',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Achievements button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: OutlinedButton(
-                            onPressed: () =>
-                                Navigator.pushNamed(context, '/achievements'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.gold,
-                              side: const BorderSide(
-                                color: AppTheme.gold,
-                                width: 2,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'ACHIEVEMENTS',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Stats button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: OutlinedButton(
-                            onPressed: () =>
-                                Navigator.pushNamed(context, '/stats'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.gold,
-                              side: const BorderSide(
-                                color: AppTheme.gold,
-                                width: 2,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'STATS',
+                              'PERFORMANCE',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -179,7 +121,6 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const UserProfileFooter(),
             ],
           ),
         ),

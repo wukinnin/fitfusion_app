@@ -3,47 +3,56 @@ import 'package:flutter/material.dart';
 
 import '../fitfusion_game.dart';
 
-class DamageNumber extends PositionComponent with HasGameReference<FitFusionGame> {
+class DamageNumber extends PositionComponent
+    with HasGameReference<FitFusionGame> {
   static const double _lifetime = 1.0;
   static const double _riseSpeed = 60.0;
 
   double _elapsed = 0;
+  bool _isActive = false;
+  bool get isEffectActive => _isActive;
 
-  DamageNumber({required Vector2 startPosition}) {
-    position = startPosition;
+  final TextPainter _textPainter = TextPainter(
+    textDirection: TextDirection.ltr,
+  );
+
+  void activateAt(double x, double y, {String text = '-1'}) {
+    position.x = x;
+    position.y = y;
+    _elapsed = 0;
+    _isActive = true;
+    _textPainter.text = TextSpan(
+      text: text,
+      style: const TextStyle(
+        color: Color(0xFFFFD700),
+        fontSize: 32,
+        fontWeight: FontWeight.bold,
+        shadows: [Shadow(blurRadius: 4, color: Colors.black)],
+      ),
+    );
+    _textPainter.layout();
   }
 
   @override
   void update(double dt) {
     super.update(dt);
+    if (!_isActive) return;
+
     _elapsed += dt;
     position.y -= _riseSpeed * dt;
 
     if (_elapsed >= _lifetime) {
-      removeFromParent();
+      _isActive = false;
     }
   }
 
   @override
   void render(Canvas canvas) {
-    final alpha = (1.0 - (_elapsed / _lifetime)).clamp(0.0, 1.0);
-    final color = Color.fromRGBO(255, 215, 0, alpha);
+    if (!_isActive) return;
 
-    final textSpan = TextSpan(
-      text: '-1',
-      style: TextStyle(
-        color: color,
-        fontSize: 32,
-        fontWeight: FontWeight.bold,
-        shadows: [
-          Shadow(blurRadius: 4, color: Colors.black.withValues(alpha: alpha)),
-        ],
-      ),
+    _textPainter.paint(
+      canvas,
+      Offset(-_textPainter.width / 2, -_textPainter.height / 2),
     );
-    final tp = TextPainter(
-      text: textSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
   }
 }

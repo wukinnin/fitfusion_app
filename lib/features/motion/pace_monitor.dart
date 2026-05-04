@@ -8,21 +8,39 @@ class PaceMonitor {
   Timer? _paceTimer;
   DateTime? _lastRepTime;
   bool _isActive = false;
+  bool _isDisposed = false;
+  Future<void>? _disposeFuture;
+  double _paceIntervalSeconds = kPaceThresholdSeconds;
 
   final StreamController<PaceEvent> _paceController =
       StreamController<PaceEvent>.broadcast();
 
   Stream<PaceEvent> get paceStream => _paceController.stream;
+  bool get isActive => _isActive;
+
+  void configure({required double paceIntervalSeconds}) {
+    if (_isDisposed) return;
+    _paceIntervalSeconds = paceIntervalSeconds > 0
+        ? paceIntervalSeconds
+        : kPaceThresholdSeconds;
+    if (_isActive) {
+      _resetTimer();
+    }
+  }
 
   /// Call this when the FIRST REP of a round is detected.
   /// This starts the pace timer. Do not call this before the first rep
   /// of a round — the player needs time to get into position.
   void startMonitoring() {
+    if (_isDisposed) return;
     if (_isActive) return; // already monitoring
     _isActive = true;
     _lastRepTime = DateTime.now();
     _resetTimer();
-    debugPrint('[PaceMonitor] Started monitoring');
+    assert(() {
+      debugPrint('[PaceMonitor] Started monitoring');
+      return true;
+    }());
   }
 
   /// Call this when a round ends (won or lost), during cooldown,
@@ -31,12 +49,16 @@ class PaceMonitor {
     _isActive = false;
     _paceTimer?.cancel();
     _paceTimer = null;
-    debugPrint('[PaceMonitor] Stopped monitoring');
+    assert(() {
+      debugPrint('[PaceMonitor] Stopped monitoring');
+      return true;
+    }());
   }
 
   /// Call this each time a rep is detected (after startMonitoring has been called).
   /// Resets the 3-second window and emits a repOnTime event.
   void onRepReceived() {
+    if (_isDisposed) return;
     if (!_isActive) return;
 
     final now = DateTime.now();
@@ -47,40 +69,62 @@ class PaceMonitor {
     _lastRepTime = now;
     _resetTimer();
 
-    _paceController.add(PaceEvent(
-      type: PaceEventType.repOnTime,
-      intervalSeconds: intervalSeconds,
-      timestamp: now,
-    ));
+    if (!_paceController.isClosed) {
+      _paceController.add(
+        PaceEvent(
+          type: PaceEventType.repOnTime,
+          intervalSeconds: intervalSeconds,
+          timestamp: now,
+        ),
+      );
+    }
   }
 
   void _resetTimer() {
     _paceTimer?.cancel();
     _paceTimer = Timer(
-      Duration(milliseconds: (kPaceThresholdSeconds * 1000).round()),
+      Duration(milliseconds: (_paceIntervalSeconds * 1000).round()),
       _onPaceViolation,
     );
   }
 
   void _onPaceViolation() {
+    if (_isDisposed) return;
     if (!_isActive) return;
 
-    debugPrint('[PaceMonitor] PACE VIOLATION — no rep in ${kPaceThresholdSeconds}s');
+    assert(() {
+      debugPrint(
+        '[PaceMonitor] PACE VIOLATION — no rep in ${_paceIntervalSeconds}s',
+      );
+      return true;
+    }());
 
-    _paceController.add(PaceEvent(
-      type: PaceEventType.paceFailed,
-      intervalSeconds: kPaceThresholdSeconds,
-      timestamp: DateTime.now(),
-    ));
+    if (!_paceController.isClosed) {
+      _paceController.add(
+        PaceEvent(
+          type: PaceEventType.paceFailed,
+          intervalSeconds: _paceIntervalSeconds,
+          timestamp: DateTime.now(),
+        ),
+      );
+    }
 
     // Restart the timer — the player must keep moving.
-    // The pace monitor keeps firing every 3 seconds until they do a rep
+    // The pace monitor keeps firing until they do a rep
     // or until stopMonitoring() is called.
     _resetTimer();
   }
 
   Future<void> dispose() async {
+    _disposeFuture ??= _disposeInternal();
+    await _disposeFuture;
+  }
+
+  Future<void> _disposeInternal() async {
+    _isDisposed = true;
     stopMonitoring();
-    await _paceController.close();
+    if (!_paceController.isClosed) {
+      await _paceController.close();
+    }
   }
 }

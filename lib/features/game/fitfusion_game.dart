@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flame/components.dart';
+import 'package:flame/components.dart' hide Timer;
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
@@ -10,6 +10,7 @@ import '../../core/enums.dart';
 import '../../core/extensions.dart';
 import '../../services/app_bgm_service.dart';
 import 'components/achievement_popup.dart';
+import 'components/bonus_item_component.dart';
 import 'components/cooldown_overlay.dart';
 import 'components/damage_flash_overlay.dart';
 import 'components/damage_number.dart';
@@ -20,7 +21,22 @@ import 'components/player_lives_display.dart';
 import 'components/rep_progress_bar.dart';
 import 'components/round_banner.dart';
 import 'components/sword_slash_component.dart';
+import 'game_launch_args.dart';
 import 'game_session.dart';
+
+enum _CooldownTarget { normalRound, beforeBonus, afterBonus }
+
+class BonusPoseSnapshot {
+  final Offset handPosition;
+  final Offset bodyCenter;
+  final double bodyRadius;
+
+  const BonusPoseSnapshot({
+    required this.handPosition,
+    required this.bodyCenter,
+    required this.bodyRadius,
+  });
+}
 
 /// The core Flame game engine for FitFusion.
 /// Manages game state, rounds, lives, and session data.
@@ -38,10 +54,20 @@ class FitFusionGame extends FlameGame {
 
   GamePhase _phase = GamePhase.cooldown;
   GamePhase get phase => _phase;
+  bool get isBonusMode => _phase == GamePhase.bonusPlaying;
 
   // Session Config
   WorkoutType _workoutType = WorkoutType.squats;
   WorkoutType get workoutType => _workoutType;
+  int _cooldownSeconds = kCooldownSeconds;
+  int get cooldownSeconds => _cooldownSeconds;
+  double _paceIntervalSeconds = kPaceThresholdSeconds;
+  double get paceIntervalSeconds => _paceIntervalSeconds;
+  GameLaunchArgs _launchArgs = const GameLaunchArgs(
+    workoutType: WorkoutType.squats,
+    cooldownSeconds: kCooldownSeconds,
+  );
+  bool _bonusRoundsEnabled = false;
 
   // Game Progress
   int _currentRound = 1;
@@ -49,6 +75,18 @@ class FitFusionGame extends FlameGame {
   int _monsterHP = 0;
   int _monsterMaxHP = 0;
   int _playerLives = kStartingLives;
+  int _dragonLifeSteals = 0;
+  int _bonusGemsCollected = 0;
+  int _activeBonusNumber = 0;
+  double _bonusTimeRemaining = 15;
+  double _bonusElapsedTotal = 0;
+  double _bonusTargetMoveTimer = 0;
+  bool _bonusEnding = false;
+  double _bonusEndDelay = 0;
+  Offset? _lastBonusSpawnCenter;
+  Offset? _lastBonusBodyCenter;
+  double _lastBonusBodyRadius = 0;
+  _CooldownTarget _cooldownTarget = _CooldownTarget.normalRound;
 
   // Session Stats
   int _totalReps = 0;
@@ -64,7 +102,6 @@ class FitFusionGame extends FlameGame {
   // Pace timer tracking
   double _paceTimeRemaining = kPaceThresholdSeconds;
   bool _paceTimerActive = false;
-  int? _previousPaceSecond;
 
   // Post-round-win delay — let hit effects play before cooldown
   static const double _roundWinDelay = 1;
@@ -81,6 +118,10 @@ class FitFusionGame extends FlameGame {
   late final RoundBanner _roundBanner;
   late final CooldownOverlay _cooldownOverlay;
   late final DamageFlashOverlay _damageFlash;
+  final List<BonusItemComponent> _bonusItems = [];
+  final List<SwordSlashComponent> _slashPool = [];
+  final List<DamageNumber> _damageNumberPool = [];
+  final Random _bonusRandom = Random();
 
   // HUD components — slide in/out with cooldown
   final List<PositionComponent> _hudComponents = [];
@@ -97,6 +138,14 @@ class FitFusionGame extends FlameGame {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    final imageFiles = [
+      ...MonsterComponent.monsterFiles,
+      'game/squats.png',
+      'game/jumping-jacks.png',
+      'game/side-crunches.png',
+      if (_bonusRoundsEnabled) ...['game/diamond.png', 'game/poison.png'],
+    ];
+    await images.loadAll(imageFiles);
 
     // === TOP HUD LAYOUT ===
     // Row 1: Health bar — full width, near top
@@ -107,11 +156,11 @@ class FitFusionGame extends FlameGame {
     // Row 2: Monster (left) | Rep counter (center) | Pace timer (right)
     const row2Y = topY + MonsterHealthBar.barHeight + 8;
 
-    _monster = MonsterComponent()..position = Vector2(8, row2Y);
+    _monster = MonsterComponent()..position = Vector2(24, row2Y + 22);
     add(_monster);
 
     _repProgress = RepProgressBar()
-      ..position = Vector2(MonsterComponent.displayWidth + 16, row2Y + 4);
+      ..position = Vector2(MonsterComponent.layoutWidth + 16, row2Y + 4);
     add(_repProgress);
 
     _paceIndicator = PaceTimerIndicator()
@@ -137,6 +186,30 @@ class FitFusionGame extends FlameGame {
       ..onCooldownComplete = _onCooldownComplete;
     add(_cooldownOverlay);
 
+    if (_bonusRoundsEnabled) {
+      final gemSprite = Sprite(images.fromCache('game/diamond.png'));
+      final poisonSprite = Sprite(images.fromCache('game/poison.png'));
+      final gemItem = BonusItemComponent(kind: BonusItemKind.gem)
+        ..sprite = gemSprite;
+      _bonusItems.add(gemItem);
+      add(gemItem);
+
+      final poisonItem = BonusItemComponent(kind: BonusItemKind.poison)
+        ..sprite = poisonSprite;
+      _bonusItems.add(poisonItem);
+      add(poisonItem);
+    }
+
+    for (var i = 0; i < 6; i++) {
+      final slash = SwordSlashComponent();
+      _slashPool.add(slash);
+      add(slash);
+
+      final damageNumber = DamageNumber();
+      _damageNumberPool.add(damageNumber);
+      add(damageNumber);
+    }
+
     // Track all HUD components for slide animation during cooldown
     _hudComponents.addAll([
       _monster,
@@ -157,8 +230,20 @@ class FitFusionGame extends FlameGame {
 
   /// Called by GameScreen/GameController before the game session starts.
   /// Must be called BEFORE the game is attached to a GameWidget.
-  void configure({required WorkoutType workoutType}) {
+  void configure({
+    required WorkoutType workoutType,
+    required int cooldownSeconds,
+    required double paceIntervalSeconds,
+    required GameLaunchArgs launchArgs,
+  }) {
     _workoutType = workoutType;
+    _cooldownSeconds = cooldownSeconds.clamp(2, 30).toInt();
+    _paceIntervalSeconds = paceIntervalSeconds > 0
+        ? paceIntervalSeconds
+        : kPaceThresholdSeconds;
+    _launchArgs = launchArgs;
+    _bonusRoundsEnabled =
+        launchArgs.bonusRoundsEnabled && !launchArgs.isMultiplayer;
   }
 
   void _resetGame() {
@@ -167,6 +252,19 @@ class FitFusionGame extends FlameGame {
     _monsterMaxHP = repsRequiredForRound(1);
     _monsterHP = _monsterMaxHP;
     _playerLives = kStartingLives;
+    _dragonLifeSteals = 0;
+    _monster.setLifeStealScale(1.0);
+    _bonusGemsCollected = 0;
+    _activeBonusNumber = 0;
+    _bonusTimeRemaining = 15;
+    _bonusElapsedTotal = 0;
+    _bonusTargetMoveTimer = 0;
+    _bonusEnding = false;
+    _bonusEndDelay = 0;
+    _lastBonusSpawnCenter = null;
+    _lastBonusBodyCenter = null;
+    _lastBonusBodyRadius = 0;
+    _deactivateBonusItems();
 
     _totalReps = 0;
     _livesLost = 0;
@@ -176,9 +274,8 @@ class FitFusionGame extends FlameGame {
     _lastRepTime = null;
     _lastRepRound = 0;
 
-    _paceTimeRemaining = kPaceThresholdSeconds;
+    _paceTimeRemaining = _paceIntervalSeconds;
     _paceTimerActive = false;
-    _previousPaceSecond = null;
 
     // Update all components
     _updateHUD();
@@ -189,10 +286,14 @@ class FitFusionGame extends FlameGame {
 
   void _updateHUD() {
     _healthBar.setHP(_monsterHP, _monsterMaxHP);
-    _repProgress.setProgress(_monsterMaxHP - _monsterHP, _monsterMaxHP);
+    _repProgress.setProgress(
+      (_monsterMaxHP - _monsterHP).clamp(0, _monsterMaxHP).toInt(),
+      _monsterMaxHP,
+    );
     _livesDisplay.setLives(_playerLives);
     _roundBanner.setRound(_currentRound);
     _roundBanner.setWorkoutLabel(_workoutType.displayName.toUpperCase());
+    _paceIndicator.configure(maxSeconds: _paceIntervalSeconds);
     _paceIndicator.setRemaining(_paceTimeRemaining);
   }
 
@@ -228,27 +329,12 @@ class FitFusionGame extends FlameGame {
 
     // Pace timer countdown during playing phase
     if (_phase == GamePhase.playing && _paceTimerActive) {
-      final previousSecond = _previousPaceSecond ?? _paceTimeRemaining.ceil();
       _paceTimeRemaining -= dt;
-      final currentSecond = _paceTimeRemaining <= 0
-          ? 0
-          : _paceTimeRemaining.ceil();
-
-      if (currentSecond < previousSecond) {
-        for (
-          var crossedSecond = previousSecond - 1;
-          crossedSecond >= currentSecond;
-          crossedSecond--
-        ) {
-          if (crossedSecond > 0 &&
-              crossedSecond < kPaceThresholdSeconds.ceil()) {
-            _playAudioSafe('sfx/tick2.mp3');
-          }
-        }
-      }
-
-      _previousPaceSecond = currentSecond;
       _paceIndicator.setRemaining(_paceTimeRemaining);
+    }
+
+    if (_phase == GamePhase.bonusPlaying) {
+      _updateBonusRound(dt);
     }
 
     // Post-round-win delay before cooldown transition
@@ -265,8 +351,23 @@ class FitFusionGame extends FlameGame {
 
   @override
   void onRemove() {
-    AppBgmService.instance.stopGameplayBgm();
-    _phaseController.close();
+    for (final timer in _popupTimers) {
+      timer.cancel();
+    }
+    _popupTimers.clear();
+    _slashPool.clear();
+    _damageNumberPool.clear();
+    _bonusItems.clear();
+    _hudComponents.clear();
+    _hudOriginalX.clear();
+    _repIntervals.clear();
+    _activePopupCount = 0;
+    _waitingForRoundWinDelay = false;
+    _paceTimerActive = false;
+
+    if (!_phaseController.isClosed) {
+      _phaseController.close();
+    }
     super.onRemove();
   }
 
@@ -284,47 +385,116 @@ class FitFusionGame extends FlameGame {
     _handlePaceFailure();
   }
 
+  void onBonusPose(BonusPoseSnapshot snapshot) {
+    if (_phase != GamePhase.bonusPlaying) return;
+    _lastBonusBodyCenter = snapshot.bodyCenter;
+    _lastBonusBodyRadius = snapshot.bodyRadius;
+    _spawnPendingBonusTargetIfReady();
+    _handleBonusCollision(snapshot.handPosition);
+  }
+
   /// Force an immediate defeat (e.g. back button press, app paused).
   void forceDefeat() {
     if (_sessionEnded) return;
     if (_phase == GamePhase.victory || _phase == GamePhase.defeat) return;
 
-    AppBgmService.instance.stopGameplayBgm();
     _playerLives = 0;
     _livesDisplay.setLives(0);
     _cooldownOverlay.stopCooldown();
-    _previousPaceSecond = null;
+    _deactivateBonusItems();
     _handleDefeat();
   }
 
   // --- Phase Management ---
 
   void _enterCooldown() {
+    _cooldownTarget = _CooldownTarget.normalRound;
     _phase = GamePhase.cooldown;
     _phaseController.add(_phase);
 
-    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
-    _previousPaceSecond = null;
     _paceIndicator.setActive(false);
 
     _cooldownOverlay.startCooldown(_currentRound);
     _playAudioSafe('sfx/win_violin.mp3');
   }
 
+  void _enterBonusCooldown(int bonusNumber) {
+    _cooldownTarget = _CooldownTarget.beforeBonus;
+    _activeBonusNumber = bonusNumber;
+    _phase = GamePhase.bonusCooldown;
+    _phaseController.add(_phase);
+
+    _paceTimerActive = false;
+    _paceIndicator.setActive(false);
+    _cooldownOverlay.startCooldown(
+      _currentRound + 1,
+      title: 'BONUS $bonusNumber',
+      caption: 'You currently have $_bonusGemsCollected gems collected.',
+      hideWorkoutImage: true,
+      captionAtBottom: true,
+    );
+    _playAudioSafe('sfx/win_violin.mp3');
+  }
+
+  void _enterPostBonusCooldown() {
+    _currentRound++;
+    _monsterMaxHP = repsRequiredForRound(_currentRound);
+    _monsterHP = _monsterMaxHP;
+    _monster.nextMonster();
+    _cooldownTarget = _CooldownTarget.afterBonus;
+    _phase = GamePhase.bonusCooldown;
+    _phaseController.add(_phase);
+
+    _paceTimerActive = false;
+    _paceIndicator.setActive(false);
+    _cooldownOverlay.startCooldown(
+      _currentRound,
+      caption:
+          'Great Job! -$_bonusGemsCollected seconds deducted to your clear time!',
+    );
+    _playAudioSafe('sfx/win_violin.mp3');
+  }
+
   void _onCooldownComplete() {
+    if (_cooldownTarget == _CooldownTarget.beforeBonus) {
+      _enterBonusPlaying();
+      return;
+    }
+
+    _cooldownTarget = _CooldownTarget.normalRound;
     // Cooldown done — enter playing phase
     _updateHUD();
 
     _phase = GamePhase.playing;
     _phaseController.add(_phase);
 
-    // Pace timer starts immediately after cooldown
-    _paceTimeRemaining = kPaceThresholdSeconds;
+    // Pace timer starts immediately after cooldown.
+    _paceTimeRemaining = _paceIntervalSeconds;
     _paceTimerActive = true;
-    _previousPaceSecond = kPaceThresholdSeconds.ceil();
     _paceIndicator.setActive(true);
-    AppBgmService.instance.startGameplayBgm();
+  }
+
+  void _enterBonusPlaying() {
+    _cooldownTarget = _CooldownTarget.normalRound;
+    _phase = GamePhase.bonusPlaying;
+    _phaseController.add(_phase);
+
+    _bonusTimeRemaining = 15;
+    _bonusTargetMoveTimer = 0;
+    _bonusEnding = false;
+    _bonusEndDelay = 0;
+    _lastBonusSpawnCenter = null;
+    _lastBonusBodyCenter = null;
+    _lastBonusBodyRadius = 0;
+    _paceTimerActive = false;
+    _paceIndicator.configure(maxSeconds: 15);
+    _paceIndicator.setRemaining(_bonusTimeRemaining);
+    _paceIndicator.setActive(true);
+    _repProgress.setCustomText('$_bonusGemsCollected GEMS');
+    _roundBanner.setCustomRoundLabel('BONUS $_activeBonusNumber');
+    _roundBanner.setWorkoutLabel(_workoutType.displayName.toUpperCase());
+    _spawnAllBonusItems();
   }
 
   // --- Internal Game Logic ---
@@ -342,9 +512,8 @@ class FitFusionGame extends FlameGame {
     _lastRepTime = now;
     _lastRepRound = _currentRound;
 
-    // Reset pace timer
-    _paceTimeRemaining = kPaceThresholdSeconds;
-    _previousPaceSecond = kPaceThresholdSeconds.ceil();
+    // Reset pace timer.
+    _paceTimeRemaining = _paceIntervalSeconds;
     _paceIndicator.setRemaining(_paceTimeRemaining);
 
     // Update visuals
@@ -358,7 +527,7 @@ class FitFusionGame extends FlameGame {
     _spawnHitEffects();
 
     // Audio
-    _playAudioSafe('sfx/thud.mp3');
+    _playAudioSafe(_monsterHP <= 0 ? 'sfx/damage.mp3' : 'sfx/slash.mp3');
 
     if (_monsterHP <= 0) {
       _handleRoundWon();
@@ -366,23 +535,27 @@ class FitFusionGame extends FlameGame {
   }
 
   void _spawnHitEffects() {
-    // Slash at monster position
-    final slashPos = Vector2(
+    final slash = _slashPool.firstWhere(
+      (effect) => !effect.isEffectActive,
+      orElse: () => _slashPool.first,
+    );
+    slash.activateAt(
       _monster.position.x +
-          MonsterComponent.displayWidth / 2 -
+          _monster.visualWidth / 2 -
           SwordSlashComponent.slashWidth / 2,
       _monster.position.y +
-          MonsterComponent.displayHeight / 2 -
+          _monster.visualHeight / 2 -
           SwordSlashComponent.slashHeight / 2,
     );
-    add(SwordSlashComponent(startPosition: slashPos));
 
-    // Damage number floating up from monster
-    final dmgPos = Vector2(
-      _monster.position.x + MonsterComponent.displayWidth / 2,
+    final damageNumber = _damageNumberPool.firstWhere(
+      (effect) => !effect.isEffectActive,
+      orElse: () => _damageNumberPool.first,
+    );
+    damageNumber.activateAt(
+      _monster.position.x + _monster.visualWidth / 2,
       _monster.position.y + 10,
     );
-    add(DamageNumber(startPosition: dmgPos));
   }
 
   void _handlePaceFailure() {
@@ -391,12 +564,24 @@ class FitFusionGame extends FlameGame {
 
     _livesDisplay.setLives(_playerLives);
     _damageFlash.trigger();
-    _playAudioSafe('sfx/damage.mp3');
+    _playAudioSafe('sfx/thud.mp3');
+
+    if (_playerLives > 0) {
+      _monsterHP++;
+      _dragonLifeSteals++;
+      _monster.setLifeStealScale(
+        1.0 + (_dragonLifeSteals * kDragonLifeStealScaleBonus),
+      );
+    }
 
     // Reset pace timer after failure
-    _paceTimeRemaining = kPaceThresholdSeconds;
-    _previousPaceSecond = kPaceThresholdSeconds.ceil();
+    _paceTimeRemaining = _paceIntervalSeconds;
     _paceIndicator.setRemaining(_paceTimeRemaining);
+    _healthBar.setHP(_monsterHP, _monsterMaxHP);
+    _repProgress.setProgress(
+      (_monsterMaxHP - _monsterHP).clamp(0, _monsterMaxHP).toInt(),
+      _monsterMaxHP,
+    );
 
     if (_playerLives <= 0) {
       _handleDefeat();
@@ -405,13 +590,11 @@ class FitFusionGame extends FlameGame {
 
   void _handleRoundWon() {
     _roundsCompleted++;
-    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
-    _previousPaceSecond = null;
     _paceIndicator.setActive(false);
 
-    // Freeze pace timer display at 5
-    _paceTimeRemaining = kPaceThresholdSeconds;
+    // Freeze pace timer display at the full workout-specific interval.
+    _paceTimeRemaining = _paceIntervalSeconds;
     _paceIndicator.setRemaining(_paceTimeRemaining);
 
     // Start delay so player sees hit effects, health bar at 0, etc.
@@ -425,6 +608,8 @@ class FitFusionGame extends FlameGame {
 
     if (_roundWinIsVictory) {
       _handleVictory();
+    } else if (_shouldStartBonusAfterRound(_currentRound)) {
+      _enterBonusCooldown(_currentRound == 4 ? 1 : 2);
     } else {
       // Advance round and enter cooldown
       _currentRound++;
@@ -442,9 +627,7 @@ class FitFusionGame extends FlameGame {
   }
 
   void _handleDefeat() {
-    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
-    _previousPaceSecond = null;
     _paceIndicator.setActive(false);
     _phase = GamePhase.defeat;
     _phaseController.add(_phase);
@@ -455,15 +638,23 @@ class FitFusionGame extends FlameGame {
     if (_sessionEnded) return;
     _sessionEnded = true;
 
-    AppBgmService.instance.stopGameplayBgm();
     _paceTimerActive = false;
-    _previousPaceSecond = null;
     _cooldownOverlay.stopCooldown();
+    _deactivateBonusItems();
 
     final endTime = DateTime.now();
     final startTime = _sessionStartTime ?? endTime;
-    final durationSeconds =
+    final rawDurationSeconds =
         endTime.difference(startTime).inMilliseconds / 1000.0;
+    final clearTimeBeforeBonusDeductionSeconds = max(
+      0.0,
+      rawDurationSeconds - _bonusElapsedTotal,
+    );
+    final bonusSecondsDeducted = won ? _bonusGemsCollected : 0;
+    final durationSeconds = max(
+      0.0,
+      clearTimeBeforeBonusDeductionSeconds - bonusSecondsDeducted.toDouble(),
+    );
 
     double bestInterval = 0.0;
     double avgInterval = 0.0;
@@ -474,23 +665,22 @@ class FitFusionGame extends FlameGame {
           _repIntervals.reduce((a, b) => a + b) / _repIntervals.length;
     }
 
-    // Total reps required across all rounds: sum of (round + 1) for rounds 1..10 = 65
-    int totalRequired = 0;
-    for (int r = 1; r <= kTotalRounds; r++) {
-      totalRequired += repsRequiredForRound(r);
-    }
-
     final session = GameSession(
       workoutType: _workoutType,
       won: won,
       totalReps: _totalReps,
-      totalRepsRequired: totalRequired,
+      totalRepsRequired: kTotalSessionReps,
       totalTimeSeconds: durationSeconds,
+      clearTimeBeforeBonusDeductionSeconds:
+          clearTimeBeforeBonusDeductionSeconds,
+      bonusGemsCollected: _bonusGemsCollected,
+      bonusSecondsDeducted: bonusSecondsDeducted,
       roundsCompleted: _roundsCompleted,
       bestRepIntervalSeconds: bestInterval,
       avgRepIntervalSeconds: avgInterval,
       livesLost: _livesLost,
       completedAt: endTime,
+      launchArgs: _launchArgs,
     );
 
     onSessionComplete(session);
@@ -499,6 +689,7 @@ class FitFusionGame extends FlameGame {
   // --- Achievement Popup ---
 
   int _activePopupCount = 0;
+  final List<Timer> _popupTimers = [];
 
   /// Spawns an achievement trophy popup below the pace timer.
   /// Each concurrent popup stacks downward via [stackIndex].
@@ -511,18 +702,259 @@ class FitFusionGame extends FlameGame {
     _playAudioSafe('sfx/achievement.mp3');
 
     // Decrement active count when popup finishes (total duration = 3.0s)
-    Future.delayed(const Duration(seconds: 3), () {
+    late final Timer popupTimer;
+    popupTimer = Timer(const Duration(seconds: 3), () {
+      _popupTimers.remove(popupTimer);
       _activePopupCount = (_activePopupCount - 1).clamp(0, 100);
     });
+    _popupTimers.add(popupTimer);
   }
 
   // --- Audio Helper ---
 
   void _playAudioSafe(String file) {
-    try {
-      AppBgmService.instance.playSfx(file);
-    } catch (e) {
-      debugPrint('[FitFusionGame] Audio error: $e');
+    unawaited(
+      AppBgmService.instance.playSfx(file).catchError((Object e) {
+        assert(() {
+          debugPrint('[FitFusionGame] Audio error: $e');
+          return true;
+        }());
+      }),
+    );
+  }
+
+  bool _shouldStartBonusAfterRound(int round) {
+    return _bonusRoundsEnabled && (round == 4 || round == 8);
+  }
+
+  void _updateBonusRound(double dt) {
+    if (_bonusEnding) {
+      _bonusEndDelay -= dt;
+      if (_bonusEndDelay <= 0) {
+        _finishBonusRound();
+      }
+      return;
     }
+
+    final consumed = min(dt, _bonusTimeRemaining);
+    _bonusTimeRemaining = max(0.0, _bonusTimeRemaining - dt);
+    _bonusElapsedTotal += consumed;
+    _paceIndicator.setRemaining(_bonusTimeRemaining);
+    _bonusTargetMoveTimer += dt;
+
+    if (_bonusTargetMoveTimer >= 2) {
+      _spawnNextBonusTarget(awayFrom: _activeBonusItem()?.centerOffset);
+    }
+
+    if (_bonusTimeRemaining <= 0) {
+      _startBonusEndDelay();
+    }
+  }
+
+  void _handleBonusCollision(Offset handPosition) {
+    if (_bonusEnding) return;
+
+    final touchedItem = _closestCollidingItem(handPosition);
+    if (touchedItem == null) return;
+
+    if (touchedItem.kind == BonusItemKind.poison) {
+      _spawnBonusFeedback(touchedItem.centerOffset, '!');
+      _playAudioSafe('sfx/poison.mp3');
+      _startBonusEndDelay();
+      return;
+    }
+
+    _bonusGemsCollected++;
+    _repProgress.setCustomText('$_bonusGemsCollected GEMS');
+    _spawnBonusFeedback(touchedItem.centerOffset, '+1');
+    _playAudioSafe('sfx/ping.mp3');
+    _spawnNextBonusTarget(awayFrom: handPosition);
+  }
+
+  BonusItemComponent? _closestCollidingItem(Offset handPosition) {
+    const touchRadius = 56.0;
+    BonusItemComponent? closest;
+    double closestDistance = double.infinity;
+
+    for (final item in _bonusItems) {
+      if (!item.isActive) continue;
+      final distance = (item.centerOffset - handPosition).distance;
+      if (distance <= touchRadius + item.size.x * 0.36 &&
+          distance < closestDistance) {
+        closest = item;
+        closestDistance = distance;
+      }
+    }
+
+    return closest;
+  }
+
+  void _finishBonusRound() {
+    if (_phase != GamePhase.bonusPlaying) return;
+    _deactivateBonusItems();
+    _bonusEnding = false;
+    _bonusEndDelay = 0;
+    _paceIndicator.setActive(false);
+    _enterPostBonusCooldown();
+  }
+
+  void _spawnAllBonusItems() {
+    _deactivateBonusItems();
+    _spawnPendingBonusTargetIfReady();
+  }
+
+  void _spawnNextBonusTarget({Offset? awayFrom}) {
+    _deactivateBonusItems();
+    _bonusTargetMoveTimer = 0;
+    final kind = _bonusRandom.nextDouble() < 0.7
+        ? BonusItemKind.gem
+        : BonusItemKind.poison;
+    final item = _bonusItemOfKind(kind);
+    if (item == null) return;
+
+    item.activateAt(_calculatedBonusPosition(item, awayFrom: awayFrom));
+    _lastBonusSpawnCenter = item.centerOffset;
+  }
+
+  void _spawnPendingBonusTargetIfReady() {
+    if (_bonusEnding || _activeBonusItem() != null) return;
+    if (_lastBonusBodyCenter == null) return;
+    _spawnNextBonusTarget();
+  }
+
+  BonusItemComponent? _activeBonusItem() {
+    for (final item in _bonusItems) {
+      if (item.isActive) return item;
+    }
+    return null;
+  }
+
+  void _startBonusEndDelay() {
+    if (_bonusEnding) return;
+    _deactivateBonusItems();
+    _bonusTimeRemaining = 0;
+    _paceIndicator.setRemaining(0);
+    _bonusEnding = true;
+    _bonusEndDelay = 2;
+  }
+
+  BonusItemComponent? _bonusItemOfKind(BonusItemKind kind) {
+    for (final item in _bonusItems) {
+      if (item.kind == kind) return item;
+    }
+    return null;
+  }
+
+  Vector2 _calculatedBonusPosition(
+    BonusItemComponent item, {
+    Offset? awayFrom,
+  }) {
+    final bounds = _bonusSpawnBounds();
+    final itemSize = BonusItemComponent.itemSize;
+    final previousCenter = awayFrom ?? _lastBonusSpawnCenter;
+    final bodyCenter = _lastBonusBodyCenter;
+    final safeBodyDistance = _lastBonusBodyRadius + itemSize * 1.35;
+    final candidates = _bonusPlacementCandidates(bounds, itemSize);
+
+    Offset? best;
+    var bestScore = -double.infinity;
+    for (final candidate in candidates) {
+      if (bodyCenter != null &&
+          (bodyCenter - candidate).distance < safeBodyDistance) {
+        continue;
+      }
+
+      final score = _scoreBonusCandidate(
+        candidate: candidate,
+        previousCenter: previousCenter,
+        bodyCenter: bodyCenter,
+      );
+      if (score > bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+
+    best ??= candidates.reduce((a, b) {
+      final aScore = _scoreBonusCandidate(
+        candidate: a,
+        previousCenter: previousCenter,
+        bodyCenter: bodyCenter,
+      );
+      final bScore = _scoreBonusCandidate(
+        candidate: b,
+        previousCenter: previousCenter,
+        bodyCenter: bodyCenter,
+      );
+      return bScore > aScore ? b : a;
+    });
+
+    return Vector2(best.dx - itemSize / 2, best.dy - itemSize / 2);
+  }
+
+  List<Offset> _bonusPlacementCandidates(Rect bounds, double itemSize) {
+    const fractions = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
+    final candidates = <Offset>[];
+    for (final xFraction in fractions) {
+      for (final yFraction in fractions) {
+        candidates.add(
+          Offset(
+            bounds.left + itemSize / 2 + (bounds.width - itemSize) * xFraction,
+            bounds.top + itemSize / 2 + (bounds.height - itemSize) * yFraction,
+          ),
+        );
+      }
+    }
+    return candidates;
+  }
+
+  double _scoreBonusCandidate({
+    required Offset candidate,
+    required Offset? previousCenter,
+    required Offset? bodyCenter,
+  }) {
+    final previousDistance = previousCenter == null
+        ? 0.0
+        : (candidate - previousCenter).distance;
+    final bodyDistance = bodyCenter == null
+        ? 0.0
+        : (candidate - bodyCenter).distance;
+    final oppositeScore = previousCenter == null || bodyCenter == null
+        ? 0.0
+        : _oppositeSideScore(candidate, previousCenter, bodyCenter);
+    return previousDistance * 1000 + oppositeScore * 500 + bodyDistance;
+  }
+
+  double _oppositeSideScore(
+    Offset candidate,
+    Offset previousCenter,
+    Offset bodyCenter,
+  ) {
+    final previousVector = previousCenter - bodyCenter;
+    final candidateVector = candidate - bodyCenter;
+    final denominator = previousVector.distance * candidateVector.distance;
+    if (denominator <= 1) return 0;
+    final dot =
+        previousVector.dx * candidateVector.dx +
+        previousVector.dy * candidateVector.dy;
+    return (-dot / denominator).clamp(-1.0, 1.0);
+  }
+
+  Rect _bonusSpawnBounds() {
+    return Rect.fromLTRB(24, 132, size.x - 24, max(132.0, size.y - 178));
+  }
+
+  void _deactivateBonusItems() {
+    for (final item in _bonusItems) {
+      item.deactivate();
+    }
+  }
+
+  void _spawnBonusFeedback(Offset position, String text) {
+    final damageNumber = _damageNumberPool.firstWhere(
+      (effect) => !effect.isEffectActive,
+      orElse: () => _damageNumberPool.first,
+    );
+    damageNumber.activateAt(position.dx, position.dy, text: text);
   }
 }

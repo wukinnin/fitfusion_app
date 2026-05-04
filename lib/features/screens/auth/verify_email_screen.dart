@@ -5,8 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/enums.dart';
 import '../../../core/theme.dart';
+import '../../../services/user_service.dart';
 import '../../../widgets/fitfusion_animated_background.dart';
+import '../../multiplayer/p2_verification_service.dart';
 
 class VerifyEmailScreen extends StatefulWidget {
   const VerifyEmailScreen({super.key});
@@ -50,10 +53,15 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   String _email = '';
-  String _type = 'signup'; // 'signup', 'recovery', 'email_change', or 'delete_account'
+  String _type =
+      'signup'; // 'signup', 'recovery', 'email_change', or 'delete_account'
 
   bool _returnOnSuccess = false;
   bool _argsParsed = false;
+
+  /// Carried through for the `multiplayer_p2` flow so we can hand the
+  /// workout selection to the cooldown screen on success.
+  WorkoutType? _workoutType;
 
   void _parseArgs() {
     if (_argsParsed) return;
@@ -63,6 +71,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       _email = args['email']?.toString() ?? '';
       _type = args['type']?.toString() ?? 'signup';
       _returnOnSuccess = args['returnOnSuccess'] == true;
+      if (args['workoutType'] is WorkoutType) {
+        _workoutType = args['workoutType'] as WorkoutType;
+      }
     }
   }
 
@@ -77,6 +88,44 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
+
+    // Multiplayer Player 2 verification routes through a dedicated service
+    // so we can preserve Player 1's session through Supabase's session swap.
+    if (_type == 'multiplayer_p2') {
+      try {
+        final p2UserId = await P2VerificationService.verifyOtp(
+          rawEmail: _email,
+          code: code,
+        );
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        Navigator.pushReplacementNamed(
+          context,
+          '/select/cooldown',
+          arguments: {
+            'workoutType': _workoutType ?? WorkoutType.jumpingJacks,
+            'isMultiplayer': true,
+            'player2UserId': p2UserId,
+            'player2Email': _email,
+          },
+        );
+      } on P2VerificationException catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = e.message;
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Verification failed';
+          });
+        }
+      }
+      return;
+    }
 
     final supabase = Supabase.instance.client;
 
@@ -105,12 +154,15 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
             params: {'target_user_id': userId},
           );
 
-          if (response != null && response is Map && response['error'] != null) {
+          if (response != null &&
+              response is Map &&
+              response['error'] != null) {
             throw AuthException(response['error']);
           }
         }
         // Sign out and redirect to welcome
         await supabase.auth.signOut();
+        UserService.clear();
       } else if (_type == 'signup') {
         // Mark email as verified in public.users
         final userId = supabase.auth.currentUser?.id;
@@ -131,6 +183,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               .update({'email': _email})
               .eq('id', userId);
         }
+        // Update the in-memory cache so any mounted footer reflects the
+        // new email immediately.
+        await UserService.refresh();
       }
 
       if (mounted) {
@@ -149,11 +204,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           );
         } else if (_type == 'delete_account') {
           // Deletion: return to welcome screen
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            '/auth',
-            (route) => false,
-          );
+          Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
         } else {
           // Signup: go to login
           Navigator.pushNamedAndRemoveUntil(
@@ -185,6 +236,48 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       _isResending = true;
       _errorMessage = null;
     });
+
+    // Multiplayer P2 resend goes through the dedicated service so the
+    // pending P1 refresh token stays valid.
+    if (_type == 'multiplayer_p2') {
+      try {
+        await P2VerificationService.resendOtp(_email);
+        if (mounted) {
+          setState(() => _isResending = false);
+          _startCooldown();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Code resent to $_email',
+                style: const TextStyle(color: AppTheme.creamWhite),
+              ),
+              backgroundColor: AppTheme.bloodRed,
+            ),
+          );
+        }
+      } on P2VerificationException catch (e) {
+        if (mounted) {
+          setState(() => _isResending = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.message),
+              backgroundColor: AppTheme.crimson,
+            ),
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() => _isResending = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to resend code'),
+              backgroundColor: AppTheme.crimson,
+            ),
+          );
+        }
+      }
+      return;
+    }
 
     final supabase = Supabase.instance.client;
 
@@ -238,7 +331,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _type == 'delete_account' ? 'CONFIRM DELETION' : 'VERIFY EMAIL',
+                    _type == 'delete_account'
+                        ? 'CONFIRM DELETION'
+                        : _type == 'multiplayer_p2'
+                            ? 'VERIFY PLAYER 2'
+                            : 'VERIFY EMAIL',
                     style: GoogleFonts.cinzelDecorative(
                       color: _type == 'delete_account'
                           ? AppTheme.crimson

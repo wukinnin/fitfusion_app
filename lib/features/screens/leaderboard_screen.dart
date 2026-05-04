@@ -6,6 +6,16 @@ import '../../core/theme.dart';
 import '../../widgets/fitfusion_animated_background.dart';
 import '../../widgets/user_profile_footer.dart';
 
+class _GroupedWorkoutRows {
+  final List<Map<String, dynamic>> singleplayer;
+  final List<Map<String, dynamic>> multiplayer;
+
+  const _GroupedWorkoutRows({
+    required this.singleplayer,
+    required this.multiplayer,
+  });
+}
+
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
 
@@ -22,24 +32,34 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   final Map<int, int> _workoutMetricIndex = {0: 0, 1: 0, 2: 0};
   // Lifetime metric index: 0 = Total Reps, 1 = Total Victories
   int _lifetimeMetricIndex = 0;
+  // Session-mode index for the per-workout tabs only:
+  //   0 = Singleplayer (default), 1 = Multiplayer.
+  // The Lifetime tab ignores this — totals are user-scoped regardless of mode.
+  int _modeIndex = 0;
 
   static const _workoutTabs = ['Squats', 'Jacks', 'Crunches', 'Lifetime'];
   static const _workoutMetrics = ['Clear Time', 'Best Rep Interval'];
   static const _lifetimeMetrics = ['Total Reps', 'Total Victories'];
+  static const _modes = ['Singleplayer', 'Multiplayer'];
   static const _workoutDbKeys = ['squats', 'jumping_jacks', 'side_crunches'];
 
   bool _loading = true;
 
-  // Cached leaderboard data: [tabIndex][metricIndex] → list of {rank, username, value}
-  // Workout tabs: 3 tabs × 2 metrics each
-  // Lifetime tab: 1 tab × 2 metrics
+  // Cached leaderboard data, keyed by `'$tab:$metric:$mode'`.
+  //   - Singleplayer rows: {rank, username, value}
+  //   - Multiplayer rows: {rank, username_a, username_b, value}
+  // Workout tabs: 3 tabs × 2 metrics × 2 modes
+  // Lifetime tab: 1 tab × 2 metrics (mode dimension always 0)
   final Map<String, List<Map<String, dynamic>>> _cache = {};
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(() => setState(() {}));
+    // Rebuild on tab change so the SP/MP toggle hides on the Lifetime tab.
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _fetchAll();
   }
 
@@ -49,41 +69,80 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     super.dispose();
   }
 
-  String _cacheKey(int tab, int metric) => '$tab:$metric';
+  String _cacheKey(int tab, int metric, [int mode = 0]) => '$tab:$metric:$mode';
 
   Future<void> _fetchAll() async {
     try {
-      // Fetch workout leaderboards (clear time + best rep interval per workout type)
-      final clearTimeRows = await _client.from('v_top10_clear_time').select();
-      final repIntervalRows = await _client
+      // ── Singleplayer per-workout leaderboards ──
+      //
+      // We pull from the global PB views (v_top10_clear_time and
+      // v_top10_best_rep_interval) instead of querying public.sessions
+      // directly. Reading public.sessions client-side is bound by the
+      // sessions_select_own RLS policy, so a regular player would only ever
+      // see their own runs ranked against themselves. The views are owned
+      // by the schema admin and bypass RLS, exposing the global top-10 to
+      // every authenticated user.
+      final clearTimeRows = await _client
+          .from('v_top10_clear_time')
+          .select('workout_type, username, value, rank');
+      final bestRepIntervalRows = await _client
           .from('v_top10_best_rep_interval')
-          .select();
+          .select('workout_type, username, value, rank');
 
       for (int tab = 0; tab < 3; tab++) {
         final dbKey = _workoutDbKeys[tab];
-
-        // Clear time (metric 0)
-        final ctEntries =
-            (clearTimeRows as List)
-                .where((r) => r['workout_type'] == dbKey)
-                .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
-                .toList()
-              ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
-        _cache[_cacheKey(tab, 0)] = ctEntries;
-
-        // Best rep interval (metric 1)
-        final riEntries =
-            (repIntervalRows as List)
-                .where((r) => r['workout_type'] == dbKey)
-                .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
-                .toList()
-              ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
-        _cache[_cacheKey(tab, 1)] = riEntries;
+        _cache[_cacheKey(tab, 0, 0)] = _rowsForWorkout(
+          clearTimeRows as List,
+          dbKey,
+        );
+        _cache[_cacheKey(tab, 1, 0)] = _rowsForWorkout(
+          bestRepIntervalRows as List,
+          dbKey,
+        );
       }
 
-      // Fetch lifetime leaderboards
+      // ── Multiplayer per-workout leaderboards ──
+      //
+      // Multiplayer entries are reconstructed by pairing two sessions rows
+      // that share an identical stats tuple (see _multiplayerPairKey). This
+      // path remains in place but is currently always empty until the
+      // multiplayer save flow can persist Player 2's row (RLS blocks the
+      // current implementation). The query itself is still RLS-bound so
+      // even once Player 2 saves are working the pair will only be
+      // detected on the players' own devices — global multiplayer ranking
+      // requires a separate view to bypass RLS.
+      final ownSessions = await _client
+          .from('sessions')
+          .select(
+            'id, user_id, workout_type, won, rounds_completed, total_reps, '
+            'lives_lost, total_time_seconds, best_rep_interval_seconds, '
+            'avg_rep_interval_seconds, completed_at, users(username)',
+          )
+          .eq('won', true)
+          .not('total_time_seconds', 'is', null)
+          .order('completed_at', ascending: false)
+          .limit(500);
+
+      final ownSessionsList = (ownSessions as List)
+          .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
+          .toList();
+      final grouped = _groupWorkoutSessions(ownSessionsList);
+
+      for (int tab = 0; tab < 3; tab++) {
+        final dbKey = _workoutDbKeys[tab];
+        _cache[_cacheKey(tab, 0, 1)] = _rankRows(
+          grouped.multiplayer.where((r) => r['workout_type'] == dbKey).toList(),
+          metricKey: 'total_time_seconds',
+        );
+        _cache[_cacheKey(tab, 1, 1)] = _rankRows(
+          grouped.multiplayer.where((r) => r['workout_type'] == dbKey).toList(),
+          metricKey: 'best_rep_interval_seconds',
+        );
+      }
+
+      // ── Lifetime leaderboards (already global via SECURITY DEFINER views) ──
       final repsRows = await _client.from('v_top10_lifetime_reps').select();
-      _cache[_cacheKey(3, 0)] = List<Map<String, dynamic>>.from(
+      _cache[_cacheKey(3, 0, 0)] = List<Map<String, dynamic>>.from(
         (repsRows as List)
           ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int)),
       );
@@ -91,7 +150,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       final victoriesRows = await _client
           .from('v_top10_lifetime_victories')
           .select();
-      _cache[_cacheKey(3, 1)] = List<Map<String, dynamic>>.from(
+      _cache[_cacheKey(3, 1, 0)] = List<Map<String, dynamic>>.from(
         (victoriesRows as List)
           ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int)),
       );
@@ -103,6 +162,138 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     }
 
     if (mounted) setState(() => _loading = false);
+  }
+
+  /// Filters one of the v_top10_* per-workout view payloads down to a single
+  /// workout type and normalises it into the shape expected by
+  /// [_buildLeaderboardTable]: `{rank, username, value}`.
+  List<Map<String, dynamic>> _rowsForWorkout(List rows, String workoutDbKey) {
+    final filtered =
+        rows
+            .cast<Map<String, dynamic>>()
+            .where((row) => row['workout_type'] == workoutDbKey)
+            .map((row) {
+              return <String, dynamic>{
+                'rank': (row['rank'] as num).toInt(),
+                'username': row['username'] ?? '--',
+                'value': _asDouble(row['value']),
+              };
+            })
+            .toList()
+          ..sort((a, b) => (a['rank'] as int).compareTo(b['rank'] as int));
+    return filtered;
+  }
+
+  _GroupedWorkoutRows _groupWorkoutSessions(List<Map<String, dynamic>> rows) {
+    final buckets = <String, List<Map<String, dynamic>>>{};
+
+    for (final row in rows) {
+      buckets.putIfAbsent(_multiplayerPairKey(row), () => []).add(row);
+    }
+
+    final pairedIds = <String>{};
+    final multiplayerRows = <Map<String, dynamic>>[];
+
+    for (final bucket in buckets.values) {
+      final byUser = <String, Map<String, dynamic>>{};
+      for (final row in bucket) {
+        final userId = row['user_id']?.toString();
+        if (userId == null || userId.isEmpty) continue;
+        byUser.putIfAbsent(userId, () => row);
+      }
+
+      if (byUser.length < 2) continue;
+
+      final pair = byUser.values.take(2).toList();
+      pairedIds.add(pair[0]['id'].toString());
+      pairedIds.add(pair[1]['id'].toString());
+      multiplayerRows.add(_buildMultiplayerRow(pair[0], pair[1]));
+    }
+
+    final singleplayerRows = rows
+        .where((row) => !pairedIds.contains(row['id']?.toString()))
+        .map(_buildSingleplayerRow)
+        .toList();
+
+    return _GroupedWorkoutRows(
+      singleplayer: singleplayerRows,
+      multiplayer: multiplayerRows,
+    );
+  }
+
+  String _multiplayerPairKey(Map<String, dynamic> row) {
+    return [
+      row['workout_type'],
+      row['won'],
+      row['rounds_completed'],
+      row['total_reps'],
+      row['lives_lost'],
+      _metricKeyValue(row['total_time_seconds']),
+      _metricKeyValue(row['best_rep_interval_seconds']),
+      _metricKeyValue(row['avg_rep_interval_seconds']),
+      row['completed_at'],
+    ].join('|');
+  }
+
+  String _metricKeyValue(dynamic value) {
+    final number = _asDouble(value);
+    if (number == null) return '';
+    return number.toStringAsFixed(6);
+  }
+
+  Map<String, dynamic> _buildSingleplayerRow(Map<String, dynamic> row) {
+    return {
+      'workout_type': row['workout_type'],
+      'username': _usernameForRow(row),
+      'total_time_seconds': row['total_time_seconds'],
+      'best_rep_interval_seconds': row['best_rep_interval_seconds'],
+    };
+  }
+
+  Map<String, dynamic> _buildMultiplayerRow(
+    Map<String, dynamic> first,
+    Map<String, dynamic> second,
+  ) {
+    return {
+      'workout_type': first['workout_type'],
+      'username_a': _usernameForRow(first),
+      'username_b': _usernameForRow(second),
+      'total_time_seconds': first['total_time_seconds'],
+      'best_rep_interval_seconds': first['best_rep_interval_seconds'],
+    };
+  }
+
+  String _usernameForRow(Map<String, dynamic> row) {
+    final user = row['users'];
+    if (user is Map && user['username'] != null) {
+      return user['username'].toString();
+    }
+    return '--';
+  }
+
+  List<Map<String, dynamic>> _rankRows(
+    List<Map<String, dynamic>> rows, {
+    required String metricKey,
+  }) {
+    final ranked =
+        rows.where((row) => _asDouble(row[metricKey]) != null).map((row) {
+          return {...row, 'value': _asDouble(row[metricKey])};
+        }).toList()..sort((a, b) {
+          return (_asDouble(a['value']) ?? double.infinity).compareTo(
+            _asDouble(b['value']) ?? double.infinity,
+          );
+        });
+
+    return List<Map<String, dynamic>>.generate(
+      ranked.length > 10 ? 10 : ranked.length,
+      (index) => {...ranked[index], 'rank': index + 1},
+    );
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
   }
 
   String _formatValue(dynamic value, {required bool isTime}) {
@@ -157,6 +348,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(),
+            // Session-mode toggle (SP / MP). Hidden on the Lifetime tab —
+            // lifetime totals are user-scoped and don't differ by mode.
+            if (_tabController.index != 3) ...[
+              const SizedBox(height: 12),
+              _buildModeSelector(),
+            ],
             Expanded(
               child: _loading
                   ? const Center(
@@ -172,7 +370,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       ],
                     ),
             ),
-            const UserProfileFooter(),
           ],
         ),
       ),
@@ -181,9 +378,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   Widget _buildWorkoutTab(int tabIndex) {
     final selectedMetric = _workoutMetricIndex[tabIndex] ?? 0;
-    final entries = _cache[_cacheKey(tabIndex, selectedMetric)] ?? [];
+    final entries =
+        _cache[_cacheKey(tabIndex, selectedMetric, _modeIndex)] ?? [];
     // Clear time and rep interval are both "lower is better" formatted as time/seconds
     final isTime = selectedMetric == 0;
+    final isMultiplayer = _modeIndex == 1;
     return Column(
       children: [
         const SizedBox(height: 12),
@@ -194,14 +393,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: _buildLeaderboardTable(entries: entries, isTime: isTime),
+          child: _buildLeaderboardTable(
+            entries: entries,
+            isTime: isTime,
+            isMultiplayer: isMultiplayer,
+          ),
         ),
       ],
     );
   }
 
   Widget _buildLifetimeTab() {
-    final entries = _cache[_cacheKey(3, _lifetimeMetricIndex)] ?? [];
+    final entries = _cache[_cacheKey(3, _lifetimeMetricIndex, 0)] ?? [];
     return Column(
       children: [
         const SizedBox(height: 12),
@@ -212,9 +415,76 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: _buildLeaderboardTable(entries: entries, isTime: false),
+          child: _buildLeaderboardTable(
+            entries: entries,
+            isTime: false,
+            isMultiplayer: false,
+          ),
         ),
       ],
+    );
+  }
+
+  /// Singleplayer / Multiplayer pill switcher. Slightly larger and bolder
+  /// than the per-tab metric selector so it reads as a higher-tier filter.
+  Widget _buildModeSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: List.generate(_modes.length, (i) {
+          final isSelected = i == _modeIndex;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _modeIndex = i),
+              child: Container(
+                margin: EdgeInsets.only(
+                  left: i == 0 ? 0 : 6,
+                  right: i == _modes.length - 1 ? 0 : 6,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppTheme.gold.withValues(alpha: 0.22)
+                      : Colors.black.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppTheme.gold
+                        : AppTheme.gold.withValues(alpha: 0.35),
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      i == 0 ? Icons.person : Icons.group,
+                      size: 16,
+                      color: isSelected
+                          ? AppTheme.gold
+                          : AppTheme.creamWhite.withValues(alpha: 0.55),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _modes[i].toUpperCase(),
+                      style: GoogleFonts.cinzel(
+                        color: isSelected
+                            ? AppTheme.gold
+                            : AppTheme.creamWhite.withValues(alpha: 0.55),
+                        fontSize: 12,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
     );
   }
 
@@ -269,6 +539,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   Widget _buildLeaderboardTable({
     required List<Map<String, dynamic>> entries,
     required bool isTime,
+    required bool isMultiplayer,
   }) {
     final itemCount = entries.isEmpty ? 10 : entries.length;
     return ListView.builder(
@@ -277,10 +548,23 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       itemBuilder: (context, i) {
         final hasData = i < entries.length;
         final rank = hasData ? entries[i]['rank'] : i + 1;
-        final username = hasData ? (entries[i]['username'] ?? '--') : '--';
         final value = hasData
             ? _formatValue(entries[i]['value'], isTime: isTime)
             : '--';
+
+        // Username display:
+        //   - Singleplayer: just `username`
+        //   - Multiplayer:  `[A] and [B]` — both required, fallback '--' each.
+        final String displayName;
+        if (isMultiplayer) {
+          final a = hasData
+              ? (entries[i]['username_a'] ?? entries[i]['username'] ?? '--')
+              : '--';
+          final b = hasData ? (entries[i]['username_b'] ?? '--') : '--';
+          displayName = '[$a] and [$b]';
+        } else {
+          displayName = hasData ? (entries[i]['username'] ?? '--') : '--';
+        }
 
         return Container(
           margin: const EdgeInsets.only(bottom: 6),
@@ -312,15 +596,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '$username',
+                  displayName,
                   style: TextStyle(
                     color: hasData
                         ? AppTheme.creamWhite
                         : AppTheme.creamWhite.withValues(alpha: 0.4),
-                    fontSize: 15,
+                    fontSize: isMultiplayer ? 13 : 15,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 value,
                 style: TextStyle(

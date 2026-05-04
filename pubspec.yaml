@@ -62,6 +62,10 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Local Notifications (Knight daily ping — OS-scheduled, no background service)
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -92,7 +96,7 @@ flutter:
 
     # --- Images (Flame looks for assets/images/) ---
     - assets/images/game/
-    - assets/images/monsters/
+    - assets/images/knight/
     
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

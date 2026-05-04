@@ -43,7 +43,9 @@ class AchievementService {
     }
 
     try {
-      await _loadAchievementMaster();
+      if (_codeToId.isEmpty) {
+        await _loadAchievementMaster();
+      }
       await _reloadUnlockedAchievements(user.id);
       _isInitialized = _codeToId.isNotEmpty;
 
@@ -125,7 +127,7 @@ class AchievementService {
     try {
       final stats = await _client
           .from('v_user_lifetime_stats')
-          .select()
+          .select('total_sessions, total_reps, total_rounds')
           .eq('user_id', user.id)
           .maybeSingle();
 

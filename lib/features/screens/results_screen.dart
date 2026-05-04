@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
@@ -27,7 +29,7 @@ class _ResultsScreenState extends State<ResultsScreen>
     super.initState();
     _slideController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(milliseconds: 350),
     );
     _slideAnimation =
         Tween<Offset>(begin: const Offset(-1.0, 0.0), end: Offset.zero).animate(
@@ -56,17 +58,21 @@ class _ResultsScreenState extends State<ResultsScreen>
   }
 
   void _playResultAudio() {
-    if (_audioPlayed || _session == null) return;
+    final session = _session;
+    if (_audioPlayed || session == null) return;
     _audioPlayed = true;
-    try {
-      if (_session!.won) {
-        AppBgmService.instance.playSfx('sfx/victory_orchestra.mp3');
-      } else {
-        AppBgmService.instance.playSfx('sfx/lose_violin.mp3');
-      }
-    } catch (e) {
-      debugPrint('[ResultsScreen] Audio error: $e');
-    }
+    unawaited(
+      AppBgmService.instance
+          .playSfx(
+            session.won ? 'sfx/victory_orchestra.mp3' : 'sfx/lose_violin.mp3',
+          )
+          .catchError((Object e) {
+            assert(() {
+              debugPrint('[ResultsScreen] Audio error: $e');
+              return true;
+            }());
+          }),
+    );
   }
 
   @override
@@ -109,7 +115,7 @@ class _ResultsScreenState extends State<ResultsScreen>
                 context,
                 '/game',
                 (route) => route.isFirst,
-                arguments: _session!.workoutType,
+                arguments: _session!.launchArgs,
               );
             },
             child: const Text('Retry', style: TextStyle(color: AppTheme.gold)),
@@ -188,6 +194,15 @@ class _ResultsScreenState extends State<ResultsScreen>
         : Colors.red.withValues(alpha: 0.25);
     final headerColor = isVictory ? AppTheme.emerald : AppTheme.crimson;
     final headerText = isVictory ? 'VICTORY' : 'DEFEAT';
+    // Only render the dual (struck-through pre-deduction + gold post-deduction)
+    // clear-time row when the player actually earned a deduction. With zero
+    // gems collected, the pre and post values would be identical and the
+    // strike-through formatting becomes confusing — fall back to the regular
+    // single-value clear-time row in that case.
+    final showBonusClearTime =
+        isVictory &&
+        session.launchArgs.bonusRoundsEnabled &&
+        session.bonusSecondsDeducted > 0;
 
     return PopScope(
       canPop: false,
@@ -231,11 +246,13 @@ class _ResultsScreenState extends State<ResultsScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildStatRow(
-                                'Clear Time:',
-                                _formatTime(session.totalTimeSeconds),
-                                forfeit: !isVictory,
-                              ),
+                              showBonusClearTime
+                                  ? _buildBonusClearTimeRow(session)
+                                  : _buildStatRow(
+                                      'Clear Time:',
+                                      _formatTime(session.totalTimeSeconds),
+                                      forfeit: !isVictory,
+                                    ),
                               const SizedBox(height: 8),
                               _buildStatRow(
                                 'Rounds Complete:',
@@ -402,6 +419,49 @@ class _ResultsScreenState extends State<ResultsScreen>
             fontSize: 16,
             decoration: decoration,
             decorationColor: decorationColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBonusClearTimeRow(GameSession session) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Clear Time:',
+          style: TextStyle(
+            color: AppTheme.creamWhite,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Flexible(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text:
+                      '${_formatTime(session.clearTimeBeforeBonusDeductionSeconds)} ',
+                  style: TextStyle(
+                    color: AppTheme.creamWhite.withValues(alpha: 0.55),
+                    fontSize: 16,
+                    decoration: TextDecoration.lineThrough,
+                    decorationColor: AppTheme.creamWhite.withValues(alpha: 0.7),
+                  ),
+                ),
+                TextSpan(
+                  text: _formatTime(session.totalTimeSeconds),
+                  style: const TextStyle(
+                    color: AppTheme.gold,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            textAlign: TextAlign.right,
           ),
         ),
       ],

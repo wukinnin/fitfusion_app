@@ -1,4 +1,5 @@
 import '../../core/enums.dart';
+import 'game_launch_args.dart';
 
 /// Immutable data class capturing the complete result of one game session.
 /// Matches the Supabase sessions table in DATABASE.md.
@@ -8,11 +9,15 @@ class GameSession {
   final int totalReps;
   final int totalRepsRequired;
   final double totalTimeSeconds;
+  final double clearTimeBeforeBonusDeductionSeconds;
+  final int bonusGemsCollected;
+  final int bonusSecondsDeducted;
   final int roundsCompleted;
   final double bestRepIntervalSeconds;
   final double avgRepIntervalSeconds;
   final int livesLost;
   final DateTime completedAt;
+  final GameLaunchArgs launchArgs;
 
   const GameSession({
     required this.workoutType,
@@ -20,12 +25,17 @@ class GameSession {
     required this.totalReps,
     required this.totalRepsRequired,
     required this.totalTimeSeconds,
+    double? clearTimeBeforeBonusDeductionSeconds,
+    this.bonusGemsCollected = 0,
+    this.bonusSecondsDeducted = 0,
     required this.roundsCompleted,
     required this.bestRepIntervalSeconds,
     required this.avgRepIntervalSeconds,
     required this.livesLost,
     required this.completedAt,
-  });
+    required this.launchArgs,
+  }) : clearTimeBeforeBonusDeductionSeconds =
+           clearTimeBeforeBonusDeductionSeconds ?? totalTimeSeconds;
 
   @override
   String toString() {
@@ -34,6 +44,8 @@ class GameSession {
         'won: $won, '
         'totalReps: $totalReps/$totalRepsRequired, '
         'totalTimeSeconds: ${totalTimeSeconds.toStringAsFixed(1)}, '
+        'bonusGemsCollected: $bonusGemsCollected, '
+        'bonusSecondsDeducted: $bonusSecondsDeducted, '
         'roundsCompleted: $roundsCompleted, '
         'bestRepIntervalSeconds: ${bestRepIntervalSeconds.toStringAsFixed(2)}, '
         'avgRepIntervalSeconds: ${avgRepIntervalSeconds.toStringAsFixed(2)}, '

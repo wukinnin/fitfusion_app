@@ -35,7 +35,6 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
 
     final supabase = Supabase.instance.client;
     final email = supabase.auth.currentUser!.email!;
-    final userId = supabase.auth.currentUser!.id;
 
     try {
       // 1. Re-authenticate with current password
@@ -50,10 +49,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
         Navigator.pushNamed(
           context,
           '/auth/verify',
-          arguments: {
-            'email': email,
-            'type': 'delete_account',
-          },
+          arguments: {'email': email, 'type': 'delete_account'},
         );
       }
     } on AuthException catch (e) {
@@ -98,6 +94,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -108,8 +105,10 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                     TextField(
                       controller: _currentPasswordController,
                       obscureText: _obscurePassword,
-                      style: GoogleFonts.crimsonText(
+                      style: const TextStyle(
+                        fontFamily: 'Georgia',
                         color: AppTheme.creamWhite,
+                        fontSize: 16,
                       ),
                       decoration: InputDecoration(
                         labelText: 'Current Password',
@@ -249,7 +248,6 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                 ),
               ),
             ),
-            const UserProfileFooter(),
           ],
         ),
       ),

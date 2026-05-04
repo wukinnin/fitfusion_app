@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../core/enums.dart';
+import '../../core/events.dart';
 import '../achievements/achievement_service.dart';
 import '../motion/pace_monitor.dart';
 import '../motion/rep_detector.dart';
@@ -13,30 +15,67 @@ import 'fitfusion_game.dart';
 /// events into game actions, and manages pace monitoring lifecycle.
 /// Also evaluates achievements at session end.
 class GameController {
+  static const Duration multiplayerRepSyncWindow = Duration(milliseconds: 1200);
+
   final FitFusionGame game;
-  final RepDetector repDetector;
+  final RepDetector? repDetector;
+  final RepDetector? player1RepDetector;
+  final RepDetector? player2RepDetector;
+  final void Function(bool enabled) setPoseDetectionEnabled;
+  final Stream<Pose?>? bonusPoseStream;
+  final BonusPoseSnapshot? Function(Pose pose)? bonusPoseMapper;
   final PaceMonitor paceMonitor;
   final AchievementService achievementService;
+  final bool isMultiplayer;
 
-  StreamSubscription<void>? _repSubscription;
-  StreamSubscription<void>? _paceSubscription;
+  StreamSubscription<RepEvent>? _repSubscription;
+  StreamSubscription<RepEvent>? _player1RepSubscription;
+  StreamSubscription<RepEvent>? _player2RepSubscription;
+  StreamSubscription<Pose?>? _bonusPoseSubscription;
+  StreamSubscription<PaceEvent>? _paceSubscription;
   StreamSubscription<GamePhase>? _phaseSubscription;
+  Timer? _pendingRepTimer;
+  DateTime? _pendingPlayer1RepAt;
+  DateTime? _pendingPlayer2RepAt;
+  Future<void>? _disposeFuture;
 
   GameController({
     required this.game,
-    required this.repDetector,
+    required this.setPoseDetectionEnabled,
     required this.paceMonitor,
     required this.achievementService,
+    this.repDetector,
+    this.player1RepDetector,
+    this.player2RepDetector,
+    this.isMultiplayer = false,
+    this.bonusPoseStream,
+    this.bonusPoseMapper,
   }) {
     _wireStreams();
   }
 
   void _wireStreams() {
     // Rep events → game
-    _repSubscription = repDetector.repStream.listen((_) {
-      if (game.phase == GamePhase.playing) {
-        paceMonitor.onRepReceived();
-        game.onRepDetected();
+    if (isMultiplayer) {
+      _player1RepSubscription = player1RepDetector?.repStream.listen((event) {
+        _onMultiplayerRep(player: 1, timestamp: event.timestamp);
+      });
+      _player2RepSubscription = player2RepDetector?.repStream.listen((event) {
+        _onMultiplayerRep(player: 2, timestamp: event.timestamp);
+      });
+    } else {
+      _repSubscription = repDetector?.repStream.listen((_) {
+        if (game.phase == GamePhase.playing) {
+          _acceptRep();
+        }
+      });
+    }
+
+    _bonusPoseSubscription = bonusPoseStream?.listen((pose) {
+      if (pose == null || game.phase != GamePhase.bonusPlaying) return;
+      final snapshot = bonusPoseMapper?.call(pose);
+      if (snapshot != null) {
+        game.onBonusPose(snapshot);
       }
     });
 
@@ -52,22 +91,115 @@ class GameController {
     _phaseSubscription = game.phaseStream.listen((phase) {
       switch (phase) {
         case GamePhase.playing:
-          // Pace timer starts immediately when playing begins
+          setPoseDetectionEnabled(true);
+          _setRepDetectorsEnabled(true);
+          // Pace timer starts immediately when playing begins.
           paceMonitor.startMonitoring();
           break;
         case GamePhase.cooldown:
+        case GamePhase.bonusCooldown:
+          setPoseDetectionEnabled(true);
+          _setRepDetectorsEnabled(false);
+          _clearPendingMultiplayerReps();
+          paceMonitor.stopMonitoring();
+          break;
+        case GamePhase.bonusPlaying:
+          setPoseDetectionEnabled(true);
+          _setRepDetectorsEnabled(false);
+          _clearPendingMultiplayerReps();
+          paceMonitor.stopMonitoring();
+          break;
         case GamePhase.victory:
         case GamePhase.defeat:
+          setPoseDetectionEnabled(false);
+          _setRepDetectorsEnabled(false);
+          _clearPendingMultiplayerReps();
           paceMonitor.stopMonitoring();
           break;
       }
     });
   }
 
+  void _onMultiplayerRep({required int player, required DateTime timestamp}) {
+    if (game.phase != GamePhase.playing) return;
+
+    final partnerRepAt = player == 1
+        ? _pendingPlayer2RepAt
+        : _pendingPlayer1RepAt;
+    if (partnerRepAt != null &&
+        (timestamp.difference(partnerRepAt).abs() <=
+            multiplayerRepSyncWindow)) {
+      _clearPendingMultiplayerReps();
+      _acceptRep();
+      return;
+    }
+
+    if (player == 1) {
+      _pendingPlayer1RepAt = timestamp;
+    } else {
+      _pendingPlayer2RepAt = timestamp;
+    }
+    _armPendingRepExpiry();
+  }
+
+  void _acceptRep() {
+    if (paceMonitor.isActive) {
+      paceMonitor.onRepReceived();
+    } else {
+      paceMonitor.startMonitoring();
+    }
+    game.onRepDetected();
+  }
+
+  void _armPendingRepExpiry() {
+    _pendingRepTimer?.cancel();
+    _pendingRepTimer = Timer(multiplayerRepSyncWindow, () {
+      _clearPendingMultiplayerReps();
+    });
+  }
+
+  void _clearPendingMultiplayerReps() {
+    _pendingRepTimer?.cancel();
+    _pendingRepTimer = null;
+    _pendingPlayer1RepAt = null;
+    _pendingPlayer2RepAt = null;
+  }
+
+  void _setRepDetectorsEnabled(bool enabled) {
+    repDetector?.setEnabled(enabled);
+    player1RepDetector?.setEnabled(enabled);
+    player2RepDetector?.setEnabled(enabled);
+  }
+
   Future<void> dispose() async {
-    await _repSubscription?.cancel();
-    await _paceSubscription?.cancel();
-    await _phaseSubscription?.cancel();
-    debugPrint('[GameController] Disposed');
+    _disposeFuture ??= _disposeInternal();
+    await _disposeFuture;
+  }
+
+  Future<void> _disposeInternal() async {
+    final repSubscription = _repSubscription;
+    final player1RepSubscription = _player1RepSubscription;
+    final player2RepSubscription = _player2RepSubscription;
+    final bonusPoseSubscription = _bonusPoseSubscription;
+    final paceSubscription = _paceSubscription;
+    final phaseSubscription = _phaseSubscription;
+    _repSubscription = null;
+    _player1RepSubscription = null;
+    _player2RepSubscription = null;
+    _bonusPoseSubscription = null;
+    _paceSubscription = null;
+    _phaseSubscription = null;
+    _clearPendingMultiplayerReps();
+
+    await repSubscription?.cancel();
+    await player1RepSubscription?.cancel();
+    await player2RepSubscription?.cancel();
+    await bonusPoseSubscription?.cancel();
+    await paceSubscription?.cancel();
+    await phaseSubscription?.cancel();
+    assert(() {
+      debugPrint('[GameController] Disposed');
+      return true;
+    }());
   }
 }

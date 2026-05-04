@@ -108,7 +108,7 @@ class _ResetPasswordSettingsScreenState
           'RESET PASSWORD',
           style: GoogleFonts.cinzelDecorative(
             color: AppTheme.gold,
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -117,6 +117,7 @@ class _ResetPasswordSettingsScreenState
       body: FitFusionAnimatedBackground(
         child: Column(
           children: [
+            const UserProfileFooter(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -158,11 +159,14 @@ class _ResetPasswordSettingsScreenState
                     const SizedBox(height: 32),
                     SizedBox(
                       height: 52,
-                      child: ElevatedButton(
+                      child: OutlinedButton(
                         onPressed: _isLoading ? null : _handleChangePassword,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.gold,
-                          foregroundColor: AppTheme.bloodRed,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.gold,
+                          side: const BorderSide(
+                            color: AppTheme.gold,
+                            width: 2,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -172,7 +176,7 @@ class _ResetPasswordSettingsScreenState
                                 width: 24,
                                 height: 24,
                                 child: CircularProgressIndicator(
-                                  color: AppTheme.bloodRed,
+                                  color: AppTheme.gold,
                                   strokeWidth: 2,
                                 ),
                               )
@@ -189,7 +193,6 @@ class _ResetPasswordSettingsScreenState
                 ),
               ),
             ),
-            const UserProfileFooter(),
           ],
         ),
       ),
@@ -205,7 +208,11 @@ class _ResetPasswordSettingsScreenState
     return TextField(
       controller: controller,
       obscureText: obscure,
-      style: GoogleFonts.crimsonText(color: AppTheme.creamWhite),
+      style: const TextStyle(
+        fontFamily: 'Georgia',
+        color: AppTheme.creamWhite,
+        fontSize: 16,
+      ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.crimsonText(

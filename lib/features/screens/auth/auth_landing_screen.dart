@@ -23,6 +23,8 @@ class AuthLandingScreen extends StatelessWidget {
                     'assets/images/game/logo.png',
                     width: 180,
                     height: 180,
+                    cacheWidth: 540,
+                    cacheHeight: 540,
                   ),
                   const SizedBox(height: 12),
                   Text(
