@@ -606,13 +606,36 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             // Layer 3: Flame game with transparent background
             GameWidget(game: _game!),
 
-            // Layer 4: Singleplayer body detection status
-            if (!_isMultiplayer)
+            // Layer 4: Body detection status
+            if (_isMultiplayer) ...[
+              StreamBuilder<Pose?>(
+                stream: _multiplayerPoseDetectorService.player1PoseStream,
+                builder: (context, snapshot) {
+                  return _BodyDetectionStatusIcon(
+                    bodyDetected: snapshot.data != null,
+                    alignment: Alignment.bottomLeft,
+                    padding: const EdgeInsets.only(left: 24, bottom: 104),
+                  );
+                },
+              ),
+              StreamBuilder<Pose?>(
+                stream: _multiplayerPoseDetectorService.player2PoseStream,
+                builder: (context, snapshot) {
+                  return _BodyDetectionStatusIcon(
+                    bodyDetected: snapshot.data != null,
+                    alignment: Alignment.bottomRight,
+                    padding: const EdgeInsets.only(right: 24, bottom: 104),
+                  );
+                },
+              ),
+            ] else
               StreamBuilder<Pose?>(
                 stream: _poseDetectorService.poseStream,
                 builder: (context, snapshot) {
                   return _BodyDetectionStatusIcon(
                     bodyDetected: snapshot.data != null,
+                    alignment: Alignment.bottomLeft,
+                    padding: const EdgeInsets.only(left: 24, bottom: 104),
                   );
                 },
               ),
@@ -649,8 +672,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
 class _BodyDetectionStatusIcon extends StatelessWidget {
   final bool bodyDetected;
+  final Alignment alignment;
+  final EdgeInsets padding;
 
-  const _BodyDetectionStatusIcon({required this.bodyDetected});
+  const _BodyDetectionStatusIcon({
+    required this.bodyDetected,
+    required this.alignment,
+    required this.padding,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -662,9 +691,9 @@ class _BodyDetectionStatusIcon extends StatelessWidget {
     return IgnorePointer(
       child: SafeArea(
         child: Align(
-          alignment: Alignment.bottomLeft,
+          alignment: alignment,
           child: Padding(
-            padding: const EdgeInsets.only(left: 24, bottom: 104),
+            padding: padding,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOut,
