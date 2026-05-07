@@ -606,7 +606,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             // Layer 3: Flame game with transparent background
             GameWidget(game: _game!),
 
-            // Layer 4: Saving overlay
+            // Layer 4: Singleplayer body detection status
+            if (!_isMultiplayer)
+              StreamBuilder<Pose?>(
+                stream: _poseDetectorService.poseStream,
+                builder: (context, snapshot) {
+                  return _BodyDetectionStatusIcon(
+                    bodyDetected: snapshot.data != null,
+                  );
+                },
+              ),
+
+            // Layer 5: Saving overlay
             if (_isSaving)
               Container(
                 color: Colors.black.withValues(alpha: 0.6),
@@ -630,6 +641,50 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BodyDetectionStatusIcon extends StatelessWidget {
+  final bool bodyDetected;
+
+  const _BodyDetectionStatusIcon({required this.bodyDetected});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color statusColor = bodyDetected
+        ? const Color(0xFF1F9D4D)
+        : const Color(0xFFC62828);
+    final IconData statusIcon = bodyDetected ? Icons.check : Icons.close;
+
+    return IgnorePointer(
+      child: SafeArea(
+        child: Align(
+          alignment: Alignment.bottomLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 24, bottom: 104),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: statusColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Icon(statusIcon, color: Colors.white, size: 38),
+            ),
+          ),
         ),
       ),
     );
