@@ -818,7 +818,6 @@ class FitFusionGame extends FlameGame {
 
   void _spawnPendingBonusTargetIfReady() {
     if (_bonusEnding || _activeBonusItem() != null) return;
-    if (_lastBonusBodyCenter == null) return;
     _spawnNextBonusTarget();
   }
 
