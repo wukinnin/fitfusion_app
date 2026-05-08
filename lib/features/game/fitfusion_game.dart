@@ -540,7 +540,7 @@ class FitFusionGame extends FlameGame {
     _cooldownOverlay.startCooldown(
       _currentRound,
       caption:
-          'Great Job! -$_bonusGemsCollected seconds deducted to your clear time!',
+          'Brilliant! -$_bonusGemsCollected seconds deducted of clear time!',
     );
     _playAudioSafe('sfx/win_violin.mp3');
   }
