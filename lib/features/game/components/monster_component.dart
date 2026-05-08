@@ -22,6 +22,8 @@ class MonsterComponent extends PositionComponent
     ..blendMode = BlendMode.srcATop;
   bool _isFlashing = false;
   double _flashTimer = 0;
+  double _baseScale = 1.0;
+  double _lifeStealScale = 1.0;
   static const double _flashDuration = 0.12;
 
   double get visualWidth => displayWidth * scale.x;
@@ -48,7 +50,21 @@ class MonsterComponent extends PositionComponent
 
   void nextMonster() {}
 
-  void setLifeStealScale(double multiplier) => scale = Vector2.all(multiplier);
+  void setBaseScale(double multiplier) {
+    if (_baseScale == multiplier) return;
+    _baseScale = multiplier;
+    _applyScale();
+  }
+
+  void setLifeStealScale(double multiplier) {
+    if (_lifeStealScale == multiplier) return;
+    _lifeStealScale = multiplier;
+    _applyScale();
+  }
+
+  void _applyScale() {
+    scale = Vector2.all(_baseScale * _lifeStealScale);
+  }
 
   void flashHit() {
     _isFlashing = true;

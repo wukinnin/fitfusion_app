@@ -239,7 +239,19 @@ class CooldownOverlay extends PositionComponent
       }
       _roundTextDirty = false;
     }
-    if (_captionAtBottom) {
+    if (game.usesLandscapeMultiplayerLayout) {
+      final titleY = screenH * 0.08;
+      _roundPainter.paint(
+        canvas,
+        Offset((screenW - _roundPainter.width) / 2, titleY),
+      );
+      if (_caption != null && _caption!.isNotEmpty) {
+        _captionPainter.paint(
+          canvas,
+          Offset((screenW - _captionPainter.width) / 2, titleY + 52),
+        );
+      }
+    } else if (_captionAtBottom) {
       final titleY = screenH * 0.76;
       if (_caption != null && _caption!.isNotEmpty) {
         _captionPainter.paint(
@@ -308,7 +320,9 @@ class CooldownOverlay extends PositionComponent
     _cachedScreenW = screenW;
     _cachedScreenH = screenH;
     _screenRect = Rect.fromLTWH(0, 0, screenW, screenH);
-    _timerCenter = Offset(screenW / 2, screenH * 0.35);
+    _timerCenter = game.usesLandscapeMultiplayerLayout
+        ? Offset(screenW / 2, screenH * 0.48)
+        : Offset(screenW / 2, screenH * 0.35);
     _arcRect = Rect.fromCircle(center: _timerCenter, radius: _circleRadius);
     _imageLayoutDirty = true;
     _roundTextDirty = true;
@@ -317,9 +331,16 @@ class CooldownOverlay extends PositionComponent
   void _updateImageLayout(ui.Image image, double screenW, double screenH) {
     if (!_imageLayoutDirty && identical(_cachedImage, image)) return;
 
-    final imageTop = _timerCenter.dy + _circleRadius + 24;
-    final maxWidth = math.min(screenW * 0.6, 280.0);
-    final maxHeight = math.min(screenH * 0.28, 200.0);
+    final isLandscapeMultiplayer = game.usesLandscapeMultiplayerLayout;
+    final imageTop = isLandscapeMultiplayer
+        ? screenH * 0.24
+        : _timerCenter.dy + _circleRadius + 24;
+    final maxWidth = isLandscapeMultiplayer
+        ? math.min(screenW * 0.20, 190.0)
+        : math.min(screenW * 0.6, 280.0);
+    final maxHeight = isLandscapeMultiplayer
+        ? math.min(screenH * 0.52, 210.0)
+        : math.min(screenH * 0.28, 200.0);
 
     final imageAspect = image.width / image.height;
     final boxAspect = maxWidth / maxHeight;
@@ -341,12 +362,10 @@ class CooldownOverlay extends PositionComponent
       image.width.toDouble(),
       image.height.toDouble(),
     );
-    _imageDstRect = Rect.fromLTWH(
-      _timerCenter.dx - drawWidth / 2,
-      imageTop,
-      drawWidth,
-      drawHeight,
-    );
+    final imageLeft = isLandscapeMultiplayer
+        ? screenW * 0.78 - drawWidth / 2
+        : _timerCenter.dx - drawWidth / 2;
+    _imageDstRect = Rect.fromLTWH(imageLeft, imageTop, drawWidth, drawHeight);
     _imageLayoutDirty = false;
   }
 

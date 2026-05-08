@@ -9,6 +9,7 @@ class RoundBanner extends PositionComponent
   int _round = 1;
   String? _customRoundLabel;
   String _workoutLabel = '';
+  bool _centerOnScreen = true;
   bool _roundDirty = true;
   bool _workoutDirty = true;
 
@@ -50,6 +51,11 @@ class RoundBanner extends PositionComponent
     _workoutDirty = true;
   }
 
+  void setCenterOnScreen(bool centerOnScreen) {
+    if (_centerOnScreen == centerOnScreen) return;
+    _centerOnScreen = centerOnScreen;
+  }
+
   @override
   void render(Canvas canvas) {
     final screenW = game.size.x;
@@ -72,16 +78,14 @@ class RoundBanner extends PositionComponent
       _workoutDirty = false;
     }
 
-    _roundPainter.paint(
-      canvas,
-      Offset((screenW - _roundPainter.width) / 2 - position.x, 0),
-    );
-    _workoutPainter.paint(
-      canvas,
-      Offset(
-        (screenW - _workoutPainter.width) / 2 - position.x,
-        _roundPainter.height + 4,
-      ),
-    );
+    final roundX = _centerOnScreen
+        ? (screenW - _roundPainter.width) / 2 - position.x
+        : 0.0;
+    final workoutX = _centerOnScreen
+        ? (screenW - _workoutPainter.width) / 2 - position.x
+        : 0.0;
+
+    _roundPainter.paint(canvas, Offset(roundX, 0));
+    _workoutPainter.paint(canvas, Offset(workoutX, _roundPainter.height + 4));
   }
 }

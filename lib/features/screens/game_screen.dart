@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flame/game.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -23,6 +24,7 @@ import '../game/game_controller.dart';
 import '../game/game_launch_args.dart';
 import '../game/game_session.dart';
 import '../motion/camera_service.dart';
+import '../motion/camera_display.dart';
 import '../motion/mediapipe_multiplayer_pose_service.dart';
 import '../motion/pace_monitor.dart';
 import '../motion/pose_detector_service.dart';
@@ -59,6 +61,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _sessionEnded = false;
   bool _isSaving = false;
   bool _isDisposed = false;
+  bool _orientationLockedForMultiplayer = false;
   Future<void>? _shutdownRealtimePipelineFuture;
 
   WorkoutType _workoutType = WorkoutType.squats;
@@ -67,6 +70,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   GameLaunchArgs? _launchArgs;
 
   bool get _isMultiplayer => _launchArgs?.isMultiplayer == true;
+  CameraDisplayMode get _cameraDisplayMode => _isMultiplayer
+      ? CameraDisplayMode.landscapeLeft
+      : CameraDisplayMode.portrait;
 
   @override
   void initState() {
@@ -164,6 +170,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Future<void> _initAll() async {
     try {
+      await _applyGameOrientation();
+      if (_isDisposed || !mounted) return;
+
       final hasPermission = await _requestCameraPermission();
       if (!hasPermission) {
         if (mounted) setState(() => _permissionDenied = true);
@@ -185,6 +194,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           _multiplayerPoseDetectorService.startProcessing(
             _cameraService.frameStream,
             _cameraService.cameraDescription!,
+            displayMode: _cameraDisplayMode,
           );
           _player1RepDetector = RepDetector(
             workoutType: WorkoutType.jumpingJacks,
@@ -272,7 +282,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         if (!retry) {
           // User chose to skip — navigate without saving
           if (mounted) setState(() => _isSaving = false);
-          _navigateToResults(session);
+          await _navigateToResults(session);
           return;
         }
       }
@@ -305,7 +315,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
 
     // 4. Navigate to results
-    _navigateToResults(session);
+    await _navigateToResults(session);
   }
 
   Future<bool> _showSaveErrorDialog() async {
@@ -341,7 +351,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     return result ?? false;
   }
 
-  void _navigateToResults(GameSession session) {
+  Future<void> _navigateToResults(GameSession session) async {
+    await _restorePortraitOrientationIfNeeded();
     if (!mounted) return;
     Navigator.pushReplacementNamed(context, '/results', arguments: session);
   }
@@ -400,6 +411,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     } else {
       _poseDetectorService.setEnabled(enabled);
     }
+  }
+
+  Future<void> _applyGameOrientation() async {
+    if (!_isMultiplayer || _orientationLockedForMultiplayer) return;
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+    ]);
+    _orientationLockedForMultiplayer = true;
+  }
+
+  Future<void> _restorePortraitOrientationIfNeeded() async {
+    if (!_orientationLockedForMultiplayer) return;
+    _orientationLockedForMultiplayer = false;
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   }
 
   BonusPoseSnapshot? _bonusPoseSnapshotForPose(Pose pose) {
@@ -479,6 +504,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _isDisposed = true;
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_shutdownRealtimePipeline());
+    unawaited(_restorePortraitOrientationIfNeeded());
     super.dispose();
   }
 
@@ -558,7 +584,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         body: Stack(
           children: [
             // Layer 1: Camera feed
-            CameraPreviewWidget(controller: _cameraService.controller),
+            CameraPreviewWidget(
+              controller: _cameraService.controller,
+              displayMode: _cameraDisplayMode,
+            ),
 
             if (_isMultiplayer) const _MultiplayerLaneOverlay(),
 
@@ -582,6 +611,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               _cameraService.controller!.value.previewSize!,
                           lensDirection: _cameraService.lensDirection,
                           sensorOrientation: _cameraService.sensorOrientation,
+                          displayMode: _cameraDisplayMode,
                         );
                       },
                     )
@@ -599,6 +629,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               _cameraService.controller!.value.previewSize!,
                           lensDirection: _cameraService.lensDirection,
                           sensorOrientation: _cameraService.sensorOrientation,
+                          displayMode: _cameraDisplayMode,
                         );
                       },
                     ),
@@ -614,8 +645,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 builder: (context, snapshot) {
                   return _BodyDetectionStatusIcon(
                     bodyDetected: snapshot.data == true,
-                    alignment: Alignment.bottomLeft,
-                    padding: const EdgeInsets.only(left: 24, bottom: 104),
+                    alignment: const Alignment(-0.78, 1),
+                    padding: const EdgeInsets.only(bottom: 24),
                   );
                 },
               ),
@@ -625,8 +656,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 builder: (context, snapshot) {
                   return _BodyDetectionStatusIcon(
                     bodyDetected: snapshot.data == true,
-                    alignment: Alignment.bottomRight,
-                    padding: const EdgeInsets.only(right: 24, bottom: 104),
+                    alignment: const Alignment(0.78, 1),
+                    padding: const EdgeInsets.only(bottom: 24),
                   );
                 },
               ),
@@ -753,11 +784,11 @@ class _MultiplayerLaneOverlay extends StatelessWidget {
             ],
           ),
           Align(
-            alignment: const Alignment(-0.82, -0.12),
+            alignment: const Alignment(-0.78, -0.12),
             child: _LaneLabel(text: 'P1'),
           ),
           Align(
-            alignment: const Alignment(0.82, -0.12),
+            alignment: const Alignment(0.78, -0.12),
             child: _LaneLabel(text: 'P2'),
           ),
         ],

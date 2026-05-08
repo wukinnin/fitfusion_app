@@ -129,6 +129,7 @@ class FitFusionGame extends FlameGame {
   final Map<PositionComponent, double> _hudOriginalX = {};
 
   bool _sessionEnded = false;
+  bool _componentsReady = false;
 
   // --- Lifecycle & Config ---
 
@@ -147,35 +148,22 @@ class FitFusionGame extends FlameGame {
     ];
     await images.loadAll(imageFiles);
 
-    // === TOP HUD LAYOUT ===
-    // Row 1: Health bar — full width, near top
-    const topY = 36.0;
-    _healthBar = MonsterHealthBar()..position = Vector2(12, topY);
+    _healthBar = MonsterHealthBar();
     add(_healthBar);
 
-    // Row 2: Monster (left) | Rep counter (center) | Pace timer (right)
-    const row2Y = topY + MonsterHealthBar.barHeight + 8;
-
-    _monster = MonsterComponent()..position = Vector2(24, row2Y + 22);
+    _monster = MonsterComponent();
     add(_monster);
 
-    _repProgress = RepProgressBar()
-      ..position = Vector2(MonsterComponent.layoutWidth + 16, row2Y + 4);
+    _repProgress = RepProgressBar();
     add(_repProgress);
 
-    _paceIndicator = PaceTimerIndicator()
-      ..position = Vector2(size.x - PaceTimerIndicator.radius * 2 - 12, row2Y);
+    _paceIndicator = PaceTimerIndicator();
     add(_paceIndicator);
 
-    // === BOTTOM HUD LAYOUT (centered) ===
-    _roundBanner = RoundBanner()..position = Vector2(0, size.y - 130);
+    _roundBanner = RoundBanner();
     add(_roundBanner);
 
-    _livesDisplay = PlayerLivesDisplay()
-      ..position = Vector2(
-        (size.x - PlayerLivesDisplay.totalWidth) / 2,
-        size.y - 80,
-      );
+    _livesDisplay = PlayerLivesDisplay();
     add(_livesDisplay);
 
     // === OVERLAYS ===
@@ -219,13 +207,17 @@ class FitFusionGame extends FlameGame {
       _roundBanner,
       _livesDisplay,
     ]);
-    // Store their original X positions
-    for (final comp in _hudComponents) {
-      _hudOriginalX[comp] = comp.position.x;
-    }
+    _componentsReady = true;
+    _layoutHudComponents();
 
     // All components ready — start the session with initial cooldown
     _resetGame();
+  }
+
+  @override
+  void onGameResize(Vector2 size) {
+    super.onGameResize(size);
+    _layoutHudComponents();
   }
 
   /// Called by GameScreen/GameController before the game session starts.
@@ -246,6 +238,80 @@ class FitFusionGame extends FlameGame {
         launchArgs.bonusRoundsEnabled && !launchArgs.isMultiplayer;
   }
 
+  bool get _useLandscapeMultiplayerLayout =>
+      _launchArgs.isMultiplayer && size.x > size.y;
+  bool get usesLandscapeMultiplayerLayout => _useLandscapeMultiplayerLayout;
+
+  void _layoutHudComponents() {
+    if (!_componentsReady || size.x <= 0 || size.y <= 0) return;
+
+    if (_useLandscapeMultiplayerLayout) {
+      final healthWidth = min(440.0, max(280.0, size.x * 0.42));
+      const heartsScale = 0.82;
+      final p2ColumnCenterX = size.x * 0.89;
+      _healthBar
+        ..setBarWidth(healthWidth)
+        ..position = Vector2((size.x - healthWidth) / 2, 14);
+
+      _monster.setBaseScale(0.86);
+      _monster.position = Vector2((size.x - _monster.visualWidth) / 2, 88);
+
+      _roundBanner
+        ..setCenterOnScreen(false)
+        ..scale = Vector2.all(0.82)
+        ..position = Vector2(24, 20);
+
+      _livesDisplay
+        ..scale = Vector2.all(heartsScale)
+        ..position = Vector2(
+          (size.x - PlayerLivesDisplay.totalWidth * heartsScale) / 2,
+          size.y - PlayerLivesDisplay.heartSize * heartsScale - 22,
+        );
+      _paceIndicator.position = Vector2(
+        p2ColumnCenterX - PaceTimerIndicator.radius,
+        16,
+      );
+      _repProgress
+        ..setCenterOnPosition(true)
+        ..setFontScale(0.82)
+        ..position = Vector2(size.x / 2, 50);
+    } else {
+      const topY = 36.0;
+      final row2Y = topY + MonsterHealthBar.barHeight + 8;
+
+      _healthBar
+        ..setBarWidth(null)
+        ..position = Vector2(12, topY);
+
+      _monster
+        ..setBaseScale(1.0)
+        ..position = Vector2(24, row2Y + 22);
+
+      _repProgress
+        ..setCenterOnPosition(false)
+        ..setFontScale(1.0)
+        ..position = Vector2(MonsterComponent.layoutWidth + 16, row2Y + 4);
+      _paceIndicator.position = Vector2(
+        size.x - PaceTimerIndicator.radius * 2 - 12,
+        row2Y,
+      );
+      _roundBanner
+        ..setCenterOnScreen(true)
+        ..scale = Vector2.all(1.0)
+        ..position = Vector2(0, size.y - 130);
+      _livesDisplay
+        ..scale = Vector2.all(1.0)
+        ..position = Vector2(
+          (size.x - PlayerLivesDisplay.totalWidth) / 2,
+          size.y - 80,
+        );
+    }
+
+    for (final comp in _hudComponents) {
+      _hudOriginalX[comp] = comp.position.x;
+    }
+  }
+
   void _resetGame() {
     _sessionEnded = false;
     _currentRound = 1;
@@ -254,6 +320,7 @@ class FitFusionGame extends FlameGame {
     _playerLives = kStartingLives;
     _dragonLifeSteals = 0;
     _monster.setLifeStealScale(1.0);
+    _layoutHudComponents();
     _bonusGemsCollected = 0;
     _activeBonusNumber = 0;
     _bonusTimeRemaining = 15;
@@ -364,6 +431,7 @@ class FitFusionGame extends FlameGame {
     _activePopupCount = 0;
     _waitingForRoundWinDelay = false;
     _paceTimerActive = false;
+    _componentsReady = false;
 
     if (!_phaseController.isClosed) {
       _phaseController.close();
@@ -570,8 +638,13 @@ class FitFusionGame extends FlameGame {
       _monsterHP++;
       _dragonLifeSteals++;
       _monster.setLifeStealScale(
-        1.0 + (_dragonLifeSteals * kDragonLifeStealScaleBonus),
+        1.0 +
+            (_dragonLifeSteals *
+                (_useLandscapeMultiplayerLayout
+                    ? 0.34
+                    : kDragonLifeStealScaleBonus)),
       );
+      _layoutHudComponents();
     }
 
     // Reset pace timer after failure

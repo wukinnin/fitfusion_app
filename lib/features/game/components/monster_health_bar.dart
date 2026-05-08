@@ -17,9 +17,17 @@ class MonsterHealthBar extends PositionComponent
     ..strokeWidth = borderWidth;
   final Paint _fillPaint = Paint()..color = const Color(0xFFB71C1C);
   double _cachedBarWidth = -1;
+  double? _barWidth;
   double _cachedFillWidth = -1;
   late RRect _bgRRect;
   RRect? _fillRRect;
+
+  void setBarWidth(double? width) {
+    if (_barWidth == width) return;
+    _barWidth = width;
+    _cachedBarWidth = -1;
+    _cachedFillWidth = -1;
+  }
 
   void setHP(int current, int max) {
     final nextFraction = max > 0 ? current / max : 0.0;
@@ -32,7 +40,7 @@ class MonsterHealthBar extends PositionComponent
   void render(Canvas canvas) {
     if (game.isBonusMode) return;
 
-    final barWidth = game.size.x - 24;
+    final barWidth = _barWidth ?? game.size.x - 24;
     if (_cachedBarWidth != barWidth) {
       _cachedBarWidth = barWidth;
       _bgRRect = RRect.fromRectAndRadius(

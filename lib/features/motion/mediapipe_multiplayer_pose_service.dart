@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../core/constants.dart';
+import 'camera_display.dart';
 import 'pose_detector_service.dart';
 
 class _PoseCandidate {
@@ -85,6 +86,7 @@ class MediaPipeMultiplayerPoseService {
   int _processedFrameCount = 0;
   int _lastNativeLatencyMs = 0;
   Future<void>? _disposeFuture;
+  CameraDisplayMode _displayMode = CameraDisplayMode.portrait;
 
   Stream<Pose?> get player1PoseStream => _player1PoseController.stream;
   Stream<Pose?> get player2PoseStream => _player2PoseController.stream;
@@ -114,9 +116,11 @@ class MediaPipeMultiplayerPoseService {
 
   void startProcessing(
     Stream<CameraImage> frameStream,
-    CameraDescription camera,
-  ) {
+    CameraDescription camera, {
+    CameraDisplayMode displayMode = CameraDisplayMode.portrait,
+  }) {
     if (_isDisposed) return;
+    _displayMode = displayMode;
     _subscription = frameStream.listen((image) => _processFrame(image, camera));
   }
 
@@ -146,11 +150,16 @@ class MediaPipeMultiplayerPoseService {
 
     try {
       final nativeCallStartedAt = DateTime.now();
+      final rotationDegrees = effectiveImageRotationDegrees(
+        sensorOrientation: camera.sensorOrientation,
+        lensDirection: camera.lensDirection,
+        displayMode: _displayMode,
+      );
       final result = await _channel
           .invokeMethod<List<dynamic>>('processFrame', {
             'width': image.width,
             'height': image.height,
-            'rotation': camera.sensorOrientation,
+            'rotation': rotationDegrees,
             'planes': image.planes.map((plane) => plane.bytes).toList(),
             'bytesPerRow': image.planes
                 .map((plane) => plane.bytesPerRow)
@@ -171,6 +180,7 @@ class MediaPipeMultiplayerPoseService {
               pose,
               Size(image.width.toDouble(), image.height.toDouble()),
               camera,
+              rotationDegrees,
             ),
           )
           .whereType<_PoseCandidate>()
@@ -341,6 +351,7 @@ class MediaPipeMultiplayerPoseService {
     Pose pose,
     Size imageSize,
     CameraDescription camera,
+    int rotationDegrees,
   ) {
     final torsoPoints = <Offset>[];
     var reliabilityTotal = 0.0;
@@ -355,7 +366,9 @@ class MediaPipeMultiplayerPoseService {
           landmark.likelihood < kMultiplayerRepLandmarkLikelihoodThreshold) {
         continue;
       }
-      torsoPoints.add(_normalizedPreviewPoint(landmark, imageSize, camera));
+      torsoPoints.add(
+        _normalizedPreviewPoint(landmark, imageSize, camera, rotationDegrees),
+      );
       reliabilityTotal += landmark.likelihood;
     }
 
@@ -425,15 +438,16 @@ class MediaPipeMultiplayerPoseService {
     PoseLandmark landmark,
     Size imageSize,
     CameraDescription camera,
+    int rotationDegrees,
   ) {
-    final isRotated =
-        camera.sensorOrientation == 90 || camera.sensorOrientation == 270;
-    final imageLogicalWidth = isRotated ? imageSize.height : imageSize.width;
-    final imageLogicalHeight = isRotated ? imageSize.width : imageSize.height;
-    var normalizedX = (landmark.x / imageLogicalWidth)
+    final logicalSize = poseCoordinateSpaceSize(
+      inputImageSize: imageSize,
+      rotationDegrees: rotationDegrees,
+    );
+    var normalizedX = (landmark.x / logicalSize.width)
         .clamp(0.0, 1.0)
         .toDouble();
-    final normalizedY = (landmark.y / imageLogicalHeight)
+    final normalizedY = (landmark.y / logicalSize.height)
         .clamp(0.0, 1.0)
         .toDouble();
 

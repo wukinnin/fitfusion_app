@@ -2,12 +2,14 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../core/constants.dart';
+import '../features/motion/camera_display.dart';
 
 class PoseOverlayWidget extends StatelessWidget {
   final Pose? pose;
   final Size inputImageSize;
   final CameraLensDirection lensDirection;
   final int sensorOrientation;
+  final CameraDisplayMode displayMode;
 
   const PoseOverlayWidget({
     super.key,
@@ -15,6 +17,7 @@ class PoseOverlayWidget extends StatelessWidget {
     required this.inputImageSize,
     required this.lensDirection,
     required this.sensorOrientation,
+    this.displayMode = CameraDisplayMode.portrait,
   });
 
   @override
@@ -28,6 +31,7 @@ class PoseOverlayWidget extends StatelessWidget {
           inputImageSize: inputImageSize,
           lensDirection: lensDirection,
           sensorOrientation: sensorOrientation,
+          displayMode: displayMode,
         ),
       ),
     );
@@ -40,6 +44,7 @@ class MultiplayerPoseOverlayWidget extends StatelessWidget {
   final Size inputImageSize;
   final CameraLensDirection lensDirection;
   final int sensorOrientation;
+  final CameraDisplayMode displayMode;
 
   const MultiplayerPoseOverlayWidget({
     super.key,
@@ -48,6 +53,7 @@ class MultiplayerPoseOverlayWidget extends StatelessWidget {
     required this.inputImageSize,
     required this.lensDirection,
     required this.sensorOrientation,
+    this.displayMode = CameraDisplayMode.portrait,
   });
 
   @override
@@ -64,6 +70,7 @@ class MultiplayerPoseOverlayWidget extends StatelessWidget {
           inputImageSize: inputImageSize,
           lensDirection: lensDirection,
           sensorOrientation: sensorOrientation,
+          displayMode: displayMode,
         ),
       ),
     );
@@ -75,6 +82,7 @@ class PoseOverlayPainter extends CustomPainter {
   final Size inputImageSize;
   final CameraLensDirection lensDirection;
   final int sensorOrientation;
+  final CameraDisplayMode displayMode;
   final Paint _paint;
   final Paint _linePaint;
 
@@ -83,6 +91,7 @@ class PoseOverlayPainter extends CustomPainter {
     required this.inputImageSize,
     required this.lensDirection,
     required this.sensorOrientation,
+    required this.displayMode,
   }) : _paint = Paint()
          ..color = Colors.greenAccent
          ..style = PaintingStyle.fill,
@@ -139,67 +148,15 @@ class PoseOverlayPainter extends CustomPainter {
   }
 
   Offset _transformCoordinates(double x, double y, Size canvasSize) {
-    // 1. Determine the logical size of the ML Kit output space
-    // If rotation metadata was used, ML Kit likely returns coordinates in the UPRIGHT space.
-    // However, inputImageSize is the raw buffer size (usually Landscape).
-    // If sensor is 90/270, the ML Kit space is swapped (Portrait).
-    final bool isRotated = sensorOrientation == 90 || sensorOrientation == 270;
-    final double imageLogicalWidth = isRotated
-        ? inputImageSize.height
-        : inputImageSize.width;
-    final double imageLogicalHeight = isRotated
-        ? inputImageSize.width
-        : inputImageSize.height;
-
-    // 2. Normalize coordinates to [0, 1] based on logical size
-    double normalizedX = x / imageLogicalWidth;
-    double normalizedY = y / imageLogicalHeight;
-
-    // 3. Mirror if FRONT camera (Flip X)
-    // Front camera preview is mirrored. ML Kit detection is "reality".
-    // Flip X to match preview.
-    if (lensDirection == CameraLensDirection.front) {
-      normalizedX = 1 - normalizedX;
-    }
-
-    // Note: No explicit rotation step here because ML Kit + Metadata = Upright Coordinates.
-
-    // 4. Scale to fit canvas (BoxFit.cover logic)
-    // We need to determine the scale factor that covers the screen
-    final double screenAspectRatio = canvasSize.width / canvasSize.height;
-    final double imageAspectRatio = imageLogicalWidth / imageLogicalHeight;
-
-    double scale, offsetX, offsetY;
-
-    if (screenAspectRatio > imageAspectRatio) {
-      // Screen is wider than image (crop top/bottom)
-      // Fit width
-      scale = canvasSize.width;
-
-      // Calculate drawn height preserving aspect ratio
-      final double drawnHeight = canvasSize.width / imageAspectRatio;
-
-      offsetX = 0;
-      offsetY = (canvasSize.height - drawnHeight) / 2;
-
-      return Offset(
-        normalizedX * scale + offsetX,
-        normalizedY * drawnHeight + offsetY,
-      );
-    } else {
-      // Screen is taller/narrower (crop left/right)
-      // Fit height
-      final double drawnHeight = canvasSize.height;
-      final double drawnWidth = canvasSize.height * imageAspectRatio;
-
-      offsetX = (canvasSize.width - drawnWidth) / 2;
-      offsetY = 0;
-
-      return Offset(
-        normalizedX * drawnWidth + offsetX,
-        normalizedY * drawnHeight + offsetY,
-      );
-    }
+    return transformPosePointToDisplay(
+      x: x,
+      y: y,
+      inputImageSize: inputImageSize,
+      canvasSize: canvasSize,
+      lensDirection: lensDirection,
+      sensorOrientation: sensorOrientation,
+      displayMode: displayMode,
+    );
   }
 
   @override
@@ -207,7 +164,8 @@ class PoseOverlayPainter extends CustomPainter {
     return oldDelegate.pose != pose ||
         oldDelegate.inputImageSize != inputImageSize ||
         oldDelegate.lensDirection != lensDirection ||
-        oldDelegate.sensorOrientation != sensorOrientation;
+        oldDelegate.sensorOrientation != sensorOrientation ||
+        oldDelegate.displayMode != displayMode;
   }
 }
 
@@ -217,6 +175,7 @@ class MultiplayerPoseOverlayPainter extends CustomPainter {
   final Size inputImageSize;
   final CameraLensDirection lensDirection;
   final int sensorOrientation;
+  final CameraDisplayMode displayMode;
 
   MultiplayerPoseOverlayPainter({
     required this.player1Pose,
@@ -224,6 +183,7 @@ class MultiplayerPoseOverlayPainter extends CustomPainter {
     required this.inputImageSize,
     required this.lensDirection,
     required this.sensorOrientation,
+    required this.displayMode,
   });
 
   @override
@@ -321,41 +281,15 @@ class MultiplayerPoseOverlayPainter extends CustomPainter {
   }
 
   Offset _transformCoordinates(double x, double y, Size canvasSize) {
-    final bool isRotated = sensorOrientation == 90 || sensorOrientation == 270;
-    final double imageLogicalWidth = isRotated
-        ? inputImageSize.height
-        : inputImageSize.width;
-    final double imageLogicalHeight = isRotated
-        ? inputImageSize.width
-        : inputImageSize.height;
-
-    double normalizedX = x / imageLogicalWidth;
-    double normalizedY = y / imageLogicalHeight;
-
-    if (lensDirection == CameraLensDirection.front) {
-      normalizedX = 1 - normalizedX;
-    }
-
-    final double screenAspectRatio = canvasSize.width / canvasSize.height;
-    final double imageAspectRatio = imageLogicalWidth / imageLogicalHeight;
-
-    if (screenAspectRatio > imageAspectRatio) {
-      final double drawnHeight = canvasSize.width / imageAspectRatio;
-      final double offsetY = (canvasSize.height - drawnHeight) / 2;
-
-      return Offset(
-        normalizedX * canvasSize.width,
-        normalizedY * drawnHeight + offsetY,
-      );
-    } else {
-      final double drawnWidth = canvasSize.height * imageAspectRatio;
-      final double offsetX = (canvasSize.width - drawnWidth) / 2;
-
-      return Offset(
-        normalizedX * drawnWidth + offsetX,
-        normalizedY * canvasSize.height,
-      );
-    }
+    return transformPosePointToDisplay(
+      x: x,
+      y: y,
+      inputImageSize: inputImageSize,
+      canvasSize: canvasSize,
+      lensDirection: lensDirection,
+      sensorOrientation: sensorOrientation,
+      displayMode: displayMode,
+    );
   }
 
   @override
@@ -364,6 +298,7 @@ class MultiplayerPoseOverlayPainter extends CustomPainter {
         oldDelegate.player2Pose != player2Pose ||
         oldDelegate.inputImageSize != inputImageSize ||
         oldDelegate.lensDirection != lensDirection ||
-        oldDelegate.sensorOrientation != sensorOrientation;
+        oldDelegate.sensorOrientation != sensorOrientation ||
+        oldDelegate.displayMode != displayMode;
   }
 }
