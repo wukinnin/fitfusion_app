@@ -7,6 +7,17 @@ class RepEvent {
   const RepEvent({required this.workoutType, required this.timestamp});
 }
 
+/// Coarse jumping-jack movement phases emitted by RepDetector.
+enum JumpingJackPhase { down, up }
+
+/// Emitted when a jumping-jack detector changes phase.
+class JumpingJackPhaseEvent {
+  final JumpingJackPhase phase;
+  final DateTime timestamp;
+
+  const JumpingJackPhaseEvent({required this.phase, required this.timestamp});
+}
+
 /// Emitted by PaceMonitor when a rep arrives on time, or when the pace fails.
 class PaceEvent {
   final PaceEventType type;

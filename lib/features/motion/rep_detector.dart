@@ -50,8 +50,12 @@ class RepDetector {
   late final StreamSubscription<Pose?> _poseSubscription;
   final StreamController<RepEvent> _repController =
       StreamController<RepEvent>.broadcast();
+  final StreamController<JumpingJackPhaseEvent> _jumpingJackPhaseController =
+      StreamController<JumpingJackPhaseEvent>.broadcast();
 
   Stream<RepEvent> get repStream => _repController.stream;
+  Stream<JumpingJackPhaseEvent> get jumpingJackPhaseStream =>
+      _jumpingJackPhaseController.stream;
   bool _isEnabled = false;
   bool _isDisposed = false;
   Future<void>? _disposeFuture;
@@ -163,6 +167,9 @@ class RepDetector {
     if (!_repController.isClosed) {
       await _repController.close();
     }
+    if (!_jumpingJackPhaseController.isClosed) {
+      await _jumpingJackPhaseController.close();
+    }
   }
 
   void _emitRep() {
@@ -173,6 +180,17 @@ class RepDetector {
     }());
     _repController.add(
       RepEvent(workoutType: workoutType, timestamp: DateTime.now()),
+    );
+  }
+
+  void _emitJumpingJackPhase(JumpingJackPhase phase) {
+    if (_isDisposed || _jumpingJackPhaseController.isClosed) return;
+    assert(() {
+      debugPrint('[RepDetector] Jumping Jack phase: $phase');
+      return true;
+    }());
+    _jumpingJackPhaseController.add(
+      JumpingJackPhaseEvent(phase: phase, timestamp: DateTime.now()),
     );
   }
 
@@ -375,6 +393,7 @@ class RepDetector {
             rightSmoothed > _jumpingJackWristRaiseThreshold &&
             symmetrySmoothed > _jumpingJackPerLegThreshold) {
           _jackState = _JumpingJackState.armsUp;
+          _emitJumpingJackPhase(JumpingJackPhase.up);
           assert(() {
             debugPrint('[RepDetector] Jumping Jack UP detected (Symmetrical)');
             return true;
@@ -389,6 +408,7 @@ class RepDetector {
             rightSmoothed <= _jumpingJackArmsDownThreshold &&
             spreadSmoothed < _jumpingJackLegsTogetherRatio) {
           _jackState = _JumpingJackState.armsDown;
+          _emitJumpingJackPhase(JumpingJackPhase.down);
           _emitRep();
         }
         break;

@@ -608,21 +608,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
             // Layer 4: Body detection status
             if (_isMultiplayer) ...[
-              StreamBuilder<Pose?>(
-                stream: _multiplayerPoseDetectorService.player1PoseStream,
+              StreamBuilder<bool>(
+                stream:
+                    _multiplayerPoseDetectorService.player1BodyDetectedStream,
                 builder: (context, snapshot) {
                   return _BodyDetectionStatusIcon(
-                    bodyDetected: snapshot.data != null,
+                    bodyDetected: snapshot.data == true,
                     alignment: Alignment.bottomLeft,
                     padding: const EdgeInsets.only(left: 24, bottom: 104),
                   );
                 },
               ),
-              StreamBuilder<Pose?>(
-                stream: _multiplayerPoseDetectorService.player2PoseStream,
+              StreamBuilder<bool>(
+                stream:
+                    _multiplayerPoseDetectorService.player2BodyDetectedStream,
                 builder: (context, snapshot) {
                   return _BodyDetectionStatusIcon(
-                    bodyDetected: snapshot.data != null,
+                    bodyDetected: snapshot.data == true,
                     alignment: Alignment.bottomRight,
                     padding: const EdgeInsets.only(right: 24, bottom: 104),
                   );
