@@ -23,12 +23,14 @@ import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
     private val channelName = "fitfusion/mediapipe_pose"
+    private val poseDetectionTimeoutMs = 1200L
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private var poseLandmarker: PoseLandmarker? = null
     private var pendingResult: MethodChannel.Result? = null
     private var pendingBitmapWidth: Int = 0
     private var pendingBitmapHeight: Int = 0
+    private var pendingCallToken: Long = 0
     private var lastTimestampMs: Long = 0
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -72,6 +74,15 @@ class MainActivity : FlutterActivity() {
         }
 
         pendingResult = result
+        val callToken = ++pendingCallToken
+        mainHandler.postDelayed({
+            if (pendingResult === result && pendingCallToken == callToken) {
+                finishPendingWithError(
+                    "MediaPipeTimeout",
+                    "Pose detection timed out before MediaPipe returned a result."
+                )
+            }
+        }, poseDetectionTimeoutMs)
         executor.execute {
             try {
                 val landmarker = ensurePoseLandmarker()

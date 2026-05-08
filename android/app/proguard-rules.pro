@@ -1,0 +1,8 @@
+-keep class com.google.mediapipe.** { *; }
+-keep class com.google.protobuf.** { *; }
+-keep class com.google.flatbuffers.** { *; }
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn com.google.mediapipe.**
+-dontwarn com.google.protobuf.**
+-dontwarn com.google.flatbuffers.**
+-dontwarn org.tensorflow.lite.**

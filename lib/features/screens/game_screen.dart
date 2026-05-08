@@ -595,8 +595,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             if (kDebugMode)
               _isMultiplayer
                   ? StreamBuilder<MultiplayerPoses>(
-                      stream:
-                          _multiplayerPoseDetectorService.multiplayerPoseStream,
+                      stream: _multiplayerPoseDetectorService
+                          .visualMultiplayerPoseStream,
                       builder: (context, snapshot) {
                         final poses = snapshot.data;
                         if (_cameraService.controller?.value.previewSize ==

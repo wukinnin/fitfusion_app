@@ -28,36 +28,77 @@ class _PoseCandidate {
   double get centerX => center.dx;
 }
 
-class _PlayerPoseTrack {
-  _PoseCandidate? _lastCandidate;
+enum _TrackPhase { searching, locked }
+
+enum _PlayerLane { left, right }
+
+class _TrackedPlayer {
+  final _PlayerLane lane;
+  _PoseCandidate? _candidate;
   DateTime? _lastFreshAt;
 
-  bool get hasCandidate => _lastCandidate != null;
+  _TrackedPlayer(this.lane);
 
-  _PoseCandidate? get lastCandidate => _lastCandidate;
+  _PoseCandidate? get candidate => _candidate;
 
-  void update(_PoseCandidate candidate, DateTime now) {
-    _lastCandidate = candidate;
+  void updateFresh(_PoseCandidate candidate, DateTime now) {
+    _candidate = candidate;
     _lastFreshAt = now;
   }
 
   void clear() {
-    _lastCandidate = null;
+    _candidate = null;
     _lastFreshAt = null;
   }
 
-  bool isPresent(DateTime now, Duration gracePeriod) {
+  bool hasFreshPose(DateTime now, Duration timeout) {
     final lastFreshAt = _lastFreshAt;
-    return lastFreshAt != null && now.difference(lastFreshAt) <= gracePeriod;
+    return lastFreshAt != null && now.difference(lastFreshAt) <= timeout;
   }
+
+  bool hasVisualPose(DateTime now, Duration timeout) {
+    return _candidate != null && hasFreshPose(now, timeout);
+  }
+
+  bool isMissingTooLong(DateTime now, Duration timeout) {
+    final lastFreshAt = _lastFreshAt;
+    return lastFreshAt == null || now.difference(lastFreshAt) > timeout;
+  }
+}
+
+class _TrackingAssignment {
+  final _PoseCandidate? player1Fresh;
+  final _PoseCandidate? player2Fresh;
+  final _PoseCandidate? player1Visual;
+  final _PoseCandidate? player2Visual;
+  final bool player1Detected;
+  final bool player2Detected;
+  final String debugLabel;
+
+  const _TrackingAssignment({
+    required this.player1Fresh,
+    required this.player2Fresh,
+    required this.player1Visual,
+    required this.player2Visual,
+    required this.player1Detected,
+    required this.player2Detected,
+    required this.debugLabel,
+  });
 }
 
 class MediaPipeMultiplayerPoseService {
   static const MethodChannel _channel = MethodChannel(
     'fitfusion/mediapipe_pose',
   );
-  static const Duration _trackGracePeriod = Duration(milliseconds: 300);
-  static const double _maxSingleCandidateTrackDistance = 0.30;
+  static const int _initialLockStableFrames = 3;
+  static const Duration _freshPoseTimeout = Duration(milliseconds: 180);
+  static const Duration _visualPoseHoldTimeout = Duration(milliseconds: 450);
+  static const Duration _fullResetTimeout = Duration(milliseconds: 1800);
+  static const double _leftLaneMaxX = 0.49;
+  static const double _rightLaneMinX = 0.51;
+  static const double _initialLockMinSeparation = 0.16;
+  static const double _maxFreshMatchDistance = 0.23;
+  static const double _maxReacquireMatchDistance = 0.34;
 
   StreamSubscription? _subscription;
   final StreamController<Pose?> _player1PoseController =
@@ -70,20 +111,25 @@ class MediaPipeMultiplayerPoseService {
       StreamController<bool>.broadcast();
   final StreamController<MultiplayerPoses> _multiplayerPoseController =
       StreamController<MultiplayerPoses>.broadcast();
+  final StreamController<MultiplayerPoses> _visualMultiplayerPoseController =
+      StreamController<MultiplayerPoses>.broadcast();
   final Duration _minProcessInterval = const Duration(
     milliseconds: 1000 ~/ kPoseDetectionTargetFps,
   );
-  final _player1Track = _PlayerPoseTrack();
-  final _player2Track = _PlayerPoseTrack();
+  final _player1Track = _TrackedPlayer(_PlayerLane.left);
+  final _player2Track = _TrackedPlayer(_PlayerLane.right);
 
   bool _isProcessing = false;
   bool _isEnabled = false;
   bool _isDisposed = false;
+  _TrackPhase _trackPhase = _TrackPhase.searching;
+  int _stableInitialLockFrames = 0;
   DateTime? _lastProcessStartedAt;
   DateTime? _lastDebugLogAt;
   int _busyFrameDrops = 0;
   int _throttledFrameDrops = 0;
   int _processedFrameCount = 0;
+  int _nativeErrorCount = 0;
   int _lastNativeLatencyMs = 0;
   Future<void>? _disposeFuture;
   CameraDisplayMode _displayMode = CameraDisplayMode.portrait;
@@ -96,6 +142,8 @@ class MediaPipeMultiplayerPoseService {
       _player2BodyDetectedController.stream;
   Stream<MultiplayerPoses> get multiplayerPoseStream =>
       _multiplayerPoseController.stream;
+  Stream<MultiplayerPoses> get visualMultiplayerPoseStream =>
+      _visualMultiplayerPoseController.stream;
 
   void setEnabled(bool enabled) {
     if (_isDisposed) return;
@@ -103,11 +151,12 @@ class MediaPipeMultiplayerPoseService {
     _isEnabled = enabled;
 
     if (!enabled) {
-      _player1Track.clear();
-      _player2Track.clear();
+      _resetTracks();
       _publishPoses(
         null,
         null,
+        player1Visual: null,
+        player2Visual: null,
         player1BodyDetected: false,
         player2BodyDetected: false,
       );
@@ -167,11 +216,13 @@ class MediaPipeMultiplayerPoseService {
             'bytesPerPixel': image.planes
                 .map((plane) => plane.bytesPerPixel ?? 1)
                 .toList(),
-          });
+          })
+          .timeout(const Duration(milliseconds: 1600));
       _lastNativeLatencyMs = DateTime.now()
           .difference(nativeCallStartedAt)
           .inMilliseconds;
       if (_isDisposed) return;
+      _nativeErrorCount = 0;
 
       final poses = _parsePoses(result ?? const []);
       final candidates = poses
@@ -188,24 +239,27 @@ class MediaPipeMultiplayerPoseService {
 
       _processedFrameCount++;
 
-      if (candidates.isEmpty) {
-        _publishTrackedPoses(null, null, now);
-        _debugLogIfNeeded('raw:${poses.length} valid:0 assign:none');
-        return;
-      }
-
-      final assignment = _assignCandidates(candidates, now);
-      _publishTrackedPoses(assignment.player1, assignment.player2, now);
+      final assignment = _updateTracking(candidates, now);
+      _publishTrackingAssignment(assignment);
       _debugLogIfNeeded(
         'raw:${poses.length} valid:${candidates.length} '
-        'assign:${assignment.debugLabel}',
+        'track:${assignment.debugLabel}',
       );
     } catch (e) {
+      _nativeErrorCount++;
       assert(() {
-        debugPrint('[MediaPipeMultiplayerPoseService] Error: $e');
+        debugPrint(
+          '[MediaPipeMultiplayerPoseService] Error ($_nativeErrorCount): $e',
+        );
         return true;
       }());
-      _publishTrackedPoses(null, null, DateTime.now());
+      if (_nativeErrorCount >= 3) {
+        _nativeErrorCount = 0;
+        _resetTracks();
+        unawaited(_resetNativeLandmarker());
+      }
+      final assignment = _updateTracking(const [], DateTime.now());
+      _publishTrackingAssignment(assignment);
     } finally {
       _isProcessing = false;
     }
@@ -240,111 +294,189 @@ class MediaPipeMultiplayerPoseService {
         .toList(growable: false);
   }
 
-  _MultiplayerAssignment _assignCandidates(
+  _TrackingAssignment _updateTracking(
     List<_PoseCandidate> candidates,
     DateTime now,
   ) {
     final sorted = candidates.toList(growable: false)
       ..sort((a, b) => a.centerX.compareTo(b.centerX));
 
-    if (sorted.length >= 2) {
-      final left = sorted.first;
-      final right = sorted.last;
+    if (_trackPhase == _TrackPhase.searching) {
+      final initial = _initialLanePair(sorted);
+      if (initial == null) {
+        _stableInitialLockFrames = 0;
+        _clearTracksIfFullyMissing(now);
+        return _currentAssignment(now, 'searching:no-stable-pair');
+      }
 
-      final p1Track = _player1Track.lastCandidate;
-      final p2Track = _player2Track.lastCandidate;
-      if (_player1Track.isPresent(now, _trackGracePeriod) &&
-          _player2Track.isPresent(now, _trackGracePeriod) &&
-          p1Track != null &&
-          p2Track != null) {
-        final directCost =
-            _assignmentCost(left, p1Track) + _assignmentCost(right, p2Track);
-        final swappedCost =
-            _assignmentCost(right, p1Track) + _assignmentCost(left, p2Track);
-        if (swappedCost < directCost) {
-          return _MultiplayerAssignment(
-            player1: right,
-            player2: left,
-            debugLabel: 'swap-tracked',
-          );
-        }
-        return _MultiplayerAssignment(
-          player1: left,
-          player2: right,
-          debugLabel: 'direct-tracked',
+      _stableInitialLockFrames++;
+      if (_stableInitialLockFrames < _initialLockStableFrames) {
+        return _currentAssignment(
+          now,
+          'searching:pair-frame-$_stableInitialLockFrames',
         );
       }
 
-      return _MultiplayerAssignment(
-        player1: left,
-        player2: right,
-        debugLabel: 'init-left-right',
-      );
+      _player1Track.updateFresh(initial.player1, now);
+      _player2Track.updateFresh(initial.player2, now);
+      _trackPhase = _TrackPhase.locked;
+      return _currentAssignment(now, 'locked:init-left-right');
     }
 
-    final only = sorted.first;
-    final p1Cost = _trackCandidateCost(
+    final used = <_PoseCandidate>{};
+    final player1 = _matchLockedTrack(
       track: _player1Track,
-      candidate: only,
+      candidates: sorted,
+      used: used,
       now: now,
     );
-    final p2Cost = _trackCandidateCost(
+    if (player1 != null) {
+      used.add(player1);
+      _player1Track.updateFresh(player1, now);
+    }
+
+    final player2 = _matchLockedTrack(
       track: _player2Track,
-      candidate: only,
+      candidates: sorted,
+      used: used,
       now: now,
     );
-
-    if (p1Cost != null || p2Cost != null) {
-      final normalizedP1Cost = p1Cost ?? double.infinity;
-      final normalizedP2Cost = p2Cost ?? double.infinity;
-      if (math.min(normalizedP1Cost, normalizedP2Cost) <=
-          _maxSingleCandidateTrackDistance) {
-        if (normalizedP1Cost <= normalizedP2Cost) {
-          return _MultiplayerAssignment(
-            player1: only,
-            player2: null,
-            debugLabel: 'single-near-p1',
-          );
-        }
-        return _MultiplayerAssignment(
-          player1: null,
-          player2: only,
-          debugLabel: 'single-near-p2',
-        );
-      }
+    if (player2 != null) {
+      used.add(player2);
+      _player2Track.updateFresh(player2, now);
     }
 
-    if (only.centerX < 0.5) {
-      return _MultiplayerAssignment(
-        player1: only,
-        player2: null,
-        debugLabel: 'single-left-fallback',
-      );
+    if (_player1Track.isMissingTooLong(now, _fullResetTimeout) &&
+        _player2Track.isMissingTooLong(now, _fullResetTimeout)) {
+      _resetTracks();
+      return _currentAssignment(now, 'reset-missing');
     }
-    return _MultiplayerAssignment(
-      player1: null,
-      player2: only,
-      debugLabel: 'single-right-fallback',
-    );
+
+    final label = switch ((player1 != null, player2 != null)) {
+      (true, true) => 'locked:fresh-both',
+      (true, false) => 'locked:held-p2',
+      (false, true) => 'locked:held-p1',
+      (false, false) => 'locked:held-both',
+    };
+    return _currentAssignment(now, label);
   }
 
-  double? _trackCandidateCost({
-    required _PlayerPoseTrack track,
-    required _PoseCandidate candidate,
+  ({_PoseCandidate player1, _PoseCandidate player2})? _initialLanePair(
+    List<_PoseCandidate> sorted,
+  ) {
+    _PoseCandidate? left;
+    _PoseCandidate? right;
+
+    for (final candidate in sorted) {
+      if (_isInLane(candidate, _PlayerLane.left)) {
+        if (left == null ||
+            _initialCandidateScore(candidate, _PlayerLane.left) <
+                _initialCandidateScore(left, _PlayerLane.left)) {
+          left = candidate;
+        }
+      } else if (_isInLane(candidate, _PlayerLane.right)) {
+        if (right == null ||
+            _initialCandidateScore(candidate, _PlayerLane.right) <
+                _initialCandidateScore(right, _PlayerLane.right)) {
+          right = candidate;
+        }
+      }
+    }
+
+    if (left == null || right == null) return null;
+    if (right.centerX - left.centerX < _initialLockMinSeparation) return null;
+    return (player1: left, player2: right);
+  }
+
+  double _initialCandidateScore(_PoseCandidate candidate, _PlayerLane lane) {
+    final laneTargetX = switch (lane) {
+      _PlayerLane.left => 0.25,
+      _PlayerLane.right => 0.75,
+    };
+    return (candidate.centerX - laneTargetX).abs() +
+        (1.0 - candidate.reliability) * 0.2 -
+        candidate.bodySize * 0.04;
+  }
+
+  _PoseCandidate? _matchLockedTrack({
+    required _TrackedPlayer track,
+    required List<_PoseCandidate> candidates,
+    required Set<_PoseCandidate> used,
     required DateTime now,
   }) {
-    final trackCandidate = track.lastCandidate;
-    if (trackCandidate == null || !track.isPresent(now, _trackGracePeriod)) {
-      return null;
+    final previous = track.candidate;
+    if (previous == null) return null;
+
+    _PoseCandidate? best;
+    var bestCost = double.infinity;
+    final isFresh = track.hasFreshPose(now, _freshPoseTimeout);
+    final maxDistance = isFresh
+        ? _maxFreshMatchDistance
+        : _maxReacquireMatchDistance;
+
+    for (final candidate in candidates) {
+      if (used.contains(candidate)) continue;
+      if (!_isInLane(candidate, track.lane)) continue;
+
+      final centerDistance = (candidate.center - previous.center).distance;
+      if (centerDistance > maxDistance) continue;
+
+      final cost = _assignmentCost(candidate, previous);
+      if (cost < bestCost) {
+        best = candidate;
+        bestCost = cost;
+      }
     }
-    return _assignmentCost(candidate, trackCandidate);
+
+    return best;
   }
 
   double _assignmentCost(_PoseCandidate candidate, _PoseCandidate previous) {
     final centerDistance = (candidate.center - previous.center).distance;
     final bodySizeDelta = (candidate.bodySize - previous.bodySize).abs();
-    final reliabilityBoost = (1.0 - candidate.reliability) * 0.04;
-    return centerDistance + bodySizeDelta * 0.5 + reliabilityBoost;
+    final reliabilityPenalty = (1.0 - candidate.reliability) * 0.04;
+    return centerDistance + bodySizeDelta * 0.45 + reliabilityPenalty;
+  }
+
+  bool _isInLane(_PoseCandidate candidate, _PlayerLane lane) {
+    return switch (lane) {
+      _PlayerLane.left => candidate.centerX <= _leftLaneMaxX,
+      _PlayerLane.right => candidate.centerX >= _rightLaneMinX,
+    };
+  }
+
+  void _clearTracksIfFullyMissing(DateTime now) {
+    if (_player1Track.isMissingTooLong(now, _fullResetTimeout) &&
+        _player2Track.isMissingTooLong(now, _fullResetTimeout)) {
+      _resetTracks();
+    }
+  }
+
+  void _resetTracks() {
+    _trackPhase = _TrackPhase.searching;
+    _stableInitialLockFrames = 0;
+    _player1Track.clear();
+    _player2Track.clear();
+  }
+
+  _TrackingAssignment _currentAssignment(DateTime now, String debugLabel) {
+    return _TrackingAssignment(
+      player1Fresh: _player1Track.hasFreshPose(now, _freshPoseTimeout)
+          ? _player1Track.candidate
+          : null,
+      player2Fresh: _player2Track.hasFreshPose(now, _freshPoseTimeout)
+          ? _player2Track.candidate
+          : null,
+      player1Visual: _player1Track.hasVisualPose(now, _visualPoseHoldTimeout)
+          ? _player1Track.candidate
+          : null,
+      player2Visual: _player2Track.hasVisualPose(now, _visualPoseHoldTimeout)
+          ? _player2Track.candidate
+          : null,
+      player1Detected: _player1Track.hasVisualPose(now, _visualPoseHoldTimeout),
+      player2Detected: _player2Track.hasVisualPose(now, _visualPoseHoldTimeout),
+      debugLabel: debugLabel,
+    );
   }
 
   _PoseCandidate? _candidateForPose(
@@ -398,29 +530,22 @@ class MediaPipeMultiplayerPoseService {
     );
   }
 
-  void _publishTrackedPoses(
-    _PoseCandidate? player1,
-    _PoseCandidate? player2,
-    DateTime now,
-  ) {
-    if (player1 != null) {
-      _player1Track.update(player1, now);
-    }
-    if (player2 != null) {
-      _player2Track.update(player2, now);
-    }
-
+  void _publishTrackingAssignment(_TrackingAssignment assignment) {
     _publishPoses(
-      player1?.pose,
-      player2?.pose,
-      player1BodyDetected: _player1Track.isPresent(now, _trackGracePeriod),
-      player2BodyDetected: _player2Track.isPresent(now, _trackGracePeriod),
+      assignment.player1Fresh?.pose,
+      assignment.player2Fresh?.pose,
+      player1Visual: assignment.player1Visual?.pose,
+      player2Visual: assignment.player2Visual?.pose,
+      player1BodyDetected: assignment.player1Detected,
+      player2BodyDetected: assignment.player2Detected,
     );
   }
 
   void _publishPoses(
     Pose? player1,
     Pose? player2, {
+    required Pose? player1Visual,
+    required Pose? player2Visual,
     required bool player1BodyDetected,
     required bool player2BodyDetected,
   }) {
@@ -431,6 +556,9 @@ class MediaPipeMultiplayerPoseService {
     _player2BodyDetectedController.add(player2BodyDetected);
     _multiplayerPoseController.add(
       MultiplayerPoses(player1: player1, player2: player2),
+    );
+    _visualMultiplayerPoseController.add(
+      MultiplayerPoses(player1: player1Visual, player2: player2Visual),
     );
   }
 
@@ -482,9 +610,7 @@ class MediaPipeMultiplayerPoseService {
     _isDisposed = true;
     _isEnabled = false;
     await _subscription?.cancel();
-    try {
-      await _channel.invokeMethod<void>('close');
-    } catch (_) {}
+    await _resetNativeLandmarker();
     if (!_player1PoseController.isClosed) {
       await _player1PoseController.close();
     }
@@ -500,17 +626,14 @@ class MediaPipeMultiplayerPoseService {
     if (!_multiplayerPoseController.isClosed) {
       await _multiplayerPoseController.close();
     }
+    if (!_visualMultiplayerPoseController.isClosed) {
+      await _visualMultiplayerPoseController.close();
+    }
   }
-}
 
-class _MultiplayerAssignment {
-  final _PoseCandidate? player1;
-  final _PoseCandidate? player2;
-  final String debugLabel;
-
-  const _MultiplayerAssignment({
-    required this.player1,
-    required this.player2,
-    required this.debugLabel,
-  });
+  Future<void> _resetNativeLandmarker() async {
+    try {
+      await _channel.invokeMethod<void>('close');
+    } catch (_) {}
+  }
 }
