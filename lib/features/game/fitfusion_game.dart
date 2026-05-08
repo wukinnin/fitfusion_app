@@ -68,6 +68,7 @@ class FitFusionGame extends FlameGame {
     cooldownSeconds: kCooldownSeconds,
   );
   bool _bonusRoundsEnabled = false;
+  bool _bonusOnlyTestMode = false;
 
   // Game Progress
   int _currentRound = 1;
@@ -144,7 +145,7 @@ class FitFusionGame extends FlameGame {
       'game/squats.png',
       'game/jumping-jacks.png',
       'game/side-crunches.png',
-      if (_bonusRoundsEnabled) ...['game/diamond.png', 'game/poison.png'],
+      if (_usesBonusAssets) ...['game/diamond.png', 'game/poison.png'],
     ];
     await images.loadAll(imageFiles);
 
@@ -174,7 +175,7 @@ class FitFusionGame extends FlameGame {
       ..onCooldownComplete = _onCooldownComplete;
     add(_cooldownOverlay);
 
-    if (_bonusRoundsEnabled) {
+    if (_usesBonusAssets) {
       final gemSprite = Sprite(images.fromCache('game/diamond.png'));
       final poisonSprite = Sprite(images.fromCache('game/poison.png'));
       final gemItem = BonusItemComponent(kind: BonusItemKind.gem)
@@ -234,13 +235,18 @@ class FitFusionGame extends FlameGame {
         ? paceIntervalSeconds
         : kPaceThresholdSeconds;
     _launchArgs = launchArgs;
+    _bonusOnlyTestMode =
+        launchArgs.bonusOnlyTestMode && !launchArgs.isMultiplayer;
     _bonusRoundsEnabled =
-        launchArgs.bonusRoundsEnabled && !launchArgs.isMultiplayer;
+        launchArgs.bonusRoundsEnabled &&
+        !launchArgs.isMultiplayer &&
+        !_bonusOnlyTestMode;
   }
 
   bool get _useLandscapeMultiplayerLayout =>
       _launchArgs.isMultiplayer && size.x > size.y;
   bool get usesLandscapeMultiplayerLayout => _useLandscapeMultiplayerLayout;
+  bool get _usesBonusAssets => _bonusRoundsEnabled || _bonusOnlyTestMode;
 
   void _layoutHudComponents() {
     if (!_componentsReady || size.x <= 0 || size.y <= 0) return;
@@ -346,6 +352,11 @@ class FitFusionGame extends FlameGame {
 
     // Update all components
     _updateHUD();
+
+    if (_bonusOnlyTestMode) {
+      _enterBonusOnlyTestRound();
+      return;
+    }
 
     // Start initial cooldown for Round 1
     _enterCooldown();
@@ -466,6 +477,16 @@ class FitFusionGame extends FlameGame {
     if (_sessionEnded) return;
     if (_phase == GamePhase.victory || _phase == GamePhase.defeat) return;
 
+    if (_bonusOnlyTestMode) {
+      _sessionEnded = true;
+      _paceTimerActive = false;
+      _paceIndicator.setActive(false);
+      _cooldownOverlay.stopCooldown();
+      _deactivateBonusItems();
+      onSessionComplete(_buildSession(won: false));
+      return;
+    }
+
     _playerLives = 0;
     _livesDisplay.setLives(0);
     _cooldownOverlay.stopCooldown();
@@ -563,6 +584,15 @@ class FitFusionGame extends FlameGame {
     _roundBanner.setCustomRoundLabel('BONUS $_activeBonusNumber');
     _roundBanner.setWorkoutLabel(_workoutType.displayName.toUpperCase());
     _spawnAllBonusItems();
+  }
+
+  void _enterBonusOnlyTestRound() {
+    _activeBonusNumber++;
+    _cooldownTarget = _CooldownTarget.normalRound;
+    _healthBar.setHP(0, 1);
+    _livesDisplay.setLives(kStartingLives);
+    _enterBonusPlaying();
+    _roundBanner.setWorkoutLabel('BONUS TEST');
   }
 
   // --- Internal Game Logic ---
@@ -715,6 +745,10 @@ class FitFusionGame extends FlameGame {
     _cooldownOverlay.stopCooldown();
     _deactivateBonusItems();
 
+    onSessionComplete(_buildSession(won: won));
+  }
+
+  GameSession _buildSession({required bool won}) {
     final endTime = DateTime.now();
     final startTime = _sessionStartTime ?? endTime;
     final rawDurationSeconds =
@@ -723,7 +757,9 @@ class FitFusionGame extends FlameGame {
       0.0,
       rawDurationSeconds - _bonusElapsedTotal,
     );
-    final bonusSecondsDeducted = won ? _bonusGemsCollected : 0;
+    final bonusSecondsDeducted = won && !_bonusOnlyTestMode
+        ? _bonusGemsCollected
+        : 0;
     final durationSeconds = max(
       0.0,
       clearTimeBeforeBonusDeductionSeconds - bonusSecondsDeducted.toDouble(),
@@ -738,7 +774,7 @@ class FitFusionGame extends FlameGame {
           _repIntervals.reduce((a, b) => a + b) / _repIntervals.length;
     }
 
-    final session = GameSession(
+    return GameSession(
       workoutType: _workoutType,
       won: won,
       totalReps: _totalReps,
@@ -755,8 +791,6 @@ class FitFusionGame extends FlameGame {
       completedAt: endTime,
       launchArgs: _launchArgs,
     );
-
-    onSessionComplete(session);
   }
 
   // --- Achievement Popup ---
@@ -868,6 +902,10 @@ class FitFusionGame extends FlameGame {
     _bonusEnding = false;
     _bonusEndDelay = 0;
     _paceIndicator.setActive(false);
+    if (_bonusOnlyTestMode) {
+      _enterBonusOnlyTestRound();
+      return;
+    }
     _enterPostBonusCooldown();
   }
 
@@ -923,45 +961,77 @@ class FitFusionGame extends FlameGame {
   }) {
     final bounds = _bonusSpawnBounds();
     final itemSize = BonusItemComponent.itemSize;
-    final previousCenter = awayFrom ?? _lastBonusSpawnCenter;
+    final avoidCenters = [?awayFrom, ?_lastBonusSpawnCenter];
     final bodyCenter = _lastBonusBodyCenter;
-    final safeBodyDistance = _lastBonusBodyRadius + itemSize * 1.35;
-    final candidates = _bonusPlacementCandidates(bounds, itemSize);
+    final safeBodyDistance = max(
+      _lastBonusBodyRadius + itemSize * 1.1,
+      itemSize * 2.2,
+    );
+    final safeAvoidDistance = max(itemSize * 2.4, bounds.shortestSide * 0.24);
 
-    Offset? best;
-    var bestScore = -double.infinity;
-    for (final candidate in candidates) {
-      if (bodyCenter != null &&
-          (bodyCenter - candidate).distance < safeBodyDistance) {
-        continue;
-      }
-
-      final score = _scoreBonusCandidate(
+    for (var i = 0; i < 36; i++) {
+      final candidate = _randomBonusCenter(bounds, itemSize);
+      if (_isSafeBonusCandidate(
         candidate: candidate,
-        previousCenter: previousCenter,
+        avoidCenters: avoidCenters,
+        safeAvoidDistance: safeAvoidDistance,
         bodyCenter: bodyCenter,
-      );
-      if (score > bestScore) {
-        best = candidate;
-        bestScore = score;
+        safeBodyDistance: safeBodyDistance,
+      )) {
+        return Vector2(
+          candidate.dx - itemSize / 2,
+          candidate.dy - itemSize / 2,
+        );
       }
     }
 
-    best ??= candidates.reduce((a, b) {
-      final aScore = _scoreBonusCandidate(
-        candidate: a,
-        previousCenter: previousCenter,
+    final relaxedCandidates = _bonusPlacementCandidates(bounds, itemSize)
+      ..shuffle(_bonusRandom);
+    for (final candidate in relaxedCandidates) {
+      if (_isSafeBonusCandidate(
+        candidate: candidate,
+        avoidCenters: avoidCenters,
+        safeAvoidDistance: safeAvoidDistance * 0.65,
         bodyCenter: bodyCenter,
-      );
-      final bScore = _scoreBonusCandidate(
-        candidate: b,
-        previousCenter: previousCenter,
-        bodyCenter: bodyCenter,
-      );
-      return bScore > aScore ? b : a;
-    });
+        safeBodyDistance: safeBodyDistance * 0.8,
+      )) {
+        return Vector2(
+          candidate.dx - itemSize / 2,
+          candidate.dy - itemSize / 2,
+        );
+      }
+    }
 
-    return Vector2(best.dx - itemSize / 2, best.dy - itemSize / 2);
+    final fallback = _randomBonusCenter(bounds, itemSize);
+    return Vector2(fallback.dx - itemSize / 2, fallback.dy - itemSize / 2);
+  }
+
+  Offset _randomBonusCenter(Rect bounds, double itemSize) {
+    final usableWidth = max(0.0, bounds.width - itemSize);
+    final usableHeight = max(0.0, bounds.height - itemSize);
+    return Offset(
+      bounds.left + itemSize / 2 + _bonusRandom.nextDouble() * usableWidth,
+      bounds.top + itemSize / 2 + _bonusRandom.nextDouble() * usableHeight,
+    );
+  }
+
+  bool _isSafeBonusCandidate({
+    required Offset candidate,
+    required List<Offset> avoidCenters,
+    required double safeAvoidDistance,
+    required Offset? bodyCenter,
+    required double safeBodyDistance,
+  }) {
+    for (final avoidCenter in avoidCenters) {
+      if ((candidate - avoidCenter).distance < safeAvoidDistance) {
+        return false;
+      }
+    }
+    if (bodyCenter != null &&
+        (candidate - bodyCenter).distance < safeBodyDistance) {
+      return false;
+    }
+    return true;
   }
 
   List<Offset> _bonusPlacementCandidates(Rect bounds, double itemSize) {
@@ -978,38 +1048,6 @@ class FitFusionGame extends FlameGame {
       }
     }
     return candidates;
-  }
-
-  double _scoreBonusCandidate({
-    required Offset candidate,
-    required Offset? previousCenter,
-    required Offset? bodyCenter,
-  }) {
-    final previousDistance = previousCenter == null
-        ? 0.0
-        : (candidate - previousCenter).distance;
-    final bodyDistance = bodyCenter == null
-        ? 0.0
-        : (candidate - bodyCenter).distance;
-    final oppositeScore = previousCenter == null || bodyCenter == null
-        ? 0.0
-        : _oppositeSideScore(candidate, previousCenter, bodyCenter);
-    return previousDistance * 1000 + oppositeScore * 500 + bodyDistance;
-  }
-
-  double _oppositeSideScore(
-    Offset candidate,
-    Offset previousCenter,
-    Offset bodyCenter,
-  ) {
-    final previousVector = previousCenter - bodyCenter;
-    final candidateVector = candidate - bodyCenter;
-    final denominator = previousVector.distance * candidateVector.distance;
-    if (denominator <= 1) return 0;
-    final dot =
-        previousVector.dx * candidateVector.dx +
-        previousVector.dy * candidateVector.dy;
-    return (-dot / denominator).clamp(-1.0, 1.0);
   }
 
   Rect _bonusSpawnBounds() {

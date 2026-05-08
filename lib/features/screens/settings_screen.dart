@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/enums.dart';
 import '../../core/theme.dart';
+import '../../features/game/game_launch_args.dart';
 import '../../features/knight/knight_disposition.dart';
 import '../../features/knight/knight_service.dart';
 import '../../services/app_bgm_service.dart';
@@ -197,6 +199,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             color: AppTheme.emerald,
                             onTap: () => _handleTestNotification(),
                           ),
+                          const SizedBox(height: 8),
+                          _buildActionTile(
+                            icon: Icons.auto_awesome,
+                            label: 'Play Bonus Test',
+                            color: AppTheme.gold,
+                            onTap: () => _launchBonusTest(),
+                          ),
                         ],
                       ),
                     ),
@@ -367,6 +376,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
     }
+  }
+
+  void _launchBonusTest() {
+    Navigator.pushNamed(
+      context,
+      '/game',
+      arguments: const GameLaunchArgs(
+        workoutType: WorkoutType.jumpingJacks,
+        cooldownSeconds: 2,
+        bonusOnlyTestMode: true,
+      ),
+    );
   }
 
   Widget _buildTestDispositionRow() {

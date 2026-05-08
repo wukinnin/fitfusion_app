@@ -70,6 +70,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   GameLaunchArgs? _launchArgs;
 
   bool get _isMultiplayer => _launchArgs?.isMultiplayer == true;
+  bool get _isBonusOnlyTest => _launchArgs?.bonusOnlyTestMode == true;
   CameraDisplayMode get _cameraDisplayMode => _isMultiplayer
       ? CameraDisplayMode.landscapeLeft
       : CameraDisplayMode.portrait;
@@ -115,24 +116,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (_launchArgs?.isMultiplayer == true &&
         _workoutType != WorkoutType.jumpingJacks) {
       _workoutType = WorkoutType.jumpingJacks;
-      _launchArgs = GameLaunchArgs(
+      _launchArgs = _launchArgs!.copyWith(
         workoutType: _workoutType,
         cooldownSeconds: _cooldownSeconds,
-        isMultiplayer: true,
-        player2UserId: _launchArgs?.player2UserId,
-        player2Email: _launchArgs?.player2Email,
         bonusRoundsEnabled: false,
+        bonusOnlyTestMode: false,
       );
     } else if (_launchArgs?.isMultiplayer == true &&
         _launchArgs?.bonusRoundsEnabled == true) {
-      _launchArgs = GameLaunchArgs(
-        workoutType: _workoutType,
-        cooldownSeconds: _cooldownSeconds,
-        isMultiplayer: true,
-        player2UserId: _launchArgs?.player2UserId,
-        player2Email: _launchArgs?.player2Email,
+      _launchArgs = _launchArgs!.copyWith(
         bonusRoundsEnabled: false,
+        bonusOnlyTestMode: false,
       );
+    }
+
+    if (_launchArgs?.isMultiplayer == true &&
+        _launchArgs?.bonusOnlyTestMode == true) {
+      _launchArgs = _launchArgs!.copyWith(bonusOnlyTestMode: false);
     }
 
     _paceIntervalSeconds = _paceIntervalForWorkout(_workoutType);
@@ -180,8 +180,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       }
       if (_isDisposed || !mounted) return;
 
-      await _achievementService.init();
-      if (_isDisposed || !mounted) return;
+      if (!_isBonusOnlyTest) {
+        await _achievementService.init();
+        if (_isDisposed || !mounted) return;
+      }
 
       await AppBgmService.instance.loadGameplayAudio();
       if (_isDisposed || !mounted) return;
@@ -256,10 +258,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _onSessionComplete(GameSession session) {
     if (_sessionEnded) return;
     _sessionEnded = true;
+    if (session.launchArgs.bonusOnlyTestMode) {
+      unawaited(_exitBonusOnlyTest());
+      return;
+    }
     unawaited(_saveAndNavigate(session));
   }
 
   Future<void> _saveAndNavigate(GameSession session) async {
+    if (session.launchArgs.bonusOnlyTestMode) {
+      await _exitBonusOnlyTest();
+      return;
+    }
+
     // Show saving indicator
     if (mounted) setState(() => _isSaving = true);
 
@@ -359,7 +370,26 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _onBackPressed() {
     if (_sessionEnded) return;
+    if (_isBonusOnlyTest) {
+      unawaited(_exitBonusOnlyTest());
+      return;
+    }
     _game?.forceDefeat();
+  }
+
+  Future<void> _exitBonusOnlyTest() async {
+    if (!_sessionEnded) _sessionEnded = true;
+    if (mounted && _isSaving) setState(() => _isSaving = false);
+
+    await _shutdownRealtimePipeline();
+    await _restorePortraitOrientationIfNeeded();
+    if (!mounted) return;
+
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushReplacementNamed(context, '/settings');
+    }
   }
 
   Future<void> _shutdownRealtimePipeline() {
